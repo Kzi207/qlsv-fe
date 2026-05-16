@@ -1,0 +1,736 @@
+import { useEffect, useMemo, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import {
+  Calendar,
+  CheckCircle2,
+  Link as LinkIcon,
+  Loader2,
+  MapPin,
+  Navigation,
+  Play,
+  QrCode,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+  XCircle,
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import api from '../api/axios';
+
+interface ClassOption {
+  name: string;
+  studentCount: number;
+}
+
+interface SessionItem {
+  id: number;
+  title: string;
+  subject: string;
+  class_id: string;
+  sessionDate: string;
+  qrToken: string;
+  lat: number;
+  lng: number;
+  radius: number;
+  isActive: boolean;
+  createdAt: string;
+  endedAt?: string | null;
+  attendeeCount: number;
+}
+
+interface SessionSummaryStats {
+  totalStudents: number;
+  checkedIn: number;
+  absentCount: number;
+  attendanceRate: number;
+  baselineCreatedCount: number;
+  verifiedIpCount: number;
+  verifiedLocationCount: number;
+}
+
+interface SessionSummaryStudent {
+  id: number;
+  name: string;
+  student_code: string;
+  class_id: string;
+  order_number?: number | null;
+  attendance: null | {
+    id: number;
+    status: string;
+    checkedInAt: string;
+    ipAddress?: string | null;
+    baselineCreated: boolean;
+    verifiedIp?: boolean | null;
+    verifiedLocation?: boolean | null;
+    profileDistance?: number | null;
+    sessionDistance?: number | null;
+  };
+  profile: null | {
+    firstIpAddress: string;
+    firstLatitude: number;
+    firstLongitude: number;
+    firstCheckInAt: string;
+    lastCheckInAt?: string | null;
+    totalVerifiedCheckIns: number;
+  };
+}
+
+interface SessionSummaryResponse {
+  session: SessionItem;
+  stats: SessionSummaryStats;
+  students: SessionSummaryStudent[];
+}
+
+const GOOGLE_MAP_PATTERNS = [
+  /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+  /!3d(-?\d+(?:\.\d+)?)[^!]*!4d(-?\d+(?:\.\d+)?)/,
+  /[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+  /[?&]ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+  /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+];
+
+const parseCoordinatesFromText = (input: string) => {
+  const text = input.trim();
+  if (!text) return null;
+
+  if (text.includes('maps.app.goo.gl')) {
+    toast.error('Link maps.app.goo.gl khong chua toa do. Vui long mo link day du hoac nhap lat,lng.');
+    return null;
+  }
+
+  for (const pattern of GOOGLE_MAP_PATTERNS) {
+    const match = text.match(pattern);
+    if (!match) continue;
+
+    const lat = Number(match[1]);
+    const lng = Number(match[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  return null;
+};
+
+const QRAttendanceManager = () => {
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [summary, setSummary] = useState<SessionSummaryResponse | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [mapInput, setMapInput] = useState('');
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [classFilter, setClassFilter] = useState('');
+  const [newSession, setNewSession] = useState({
+    title: '',
+    subject: '',
+    class_id: '',
+    sessionDate: new Date().toISOString().slice(0, 10),
+    radius: 100,
+    lat: 0,
+    lng: 0,
+  });
+
+  const selectedSession = useMemo(
+    () => sessions.find((session) => session.id === selectedSessionId) || null,
+    [selectedSessionId, sessions],
+  );
+
+  const previewGoogleMapsUrl = useMemo(() => {
+    if (!newSession.lat || !newSession.lng) return '';
+    return `https://www.google.com/maps?q=${newSession.lat},${newSession.lng}`;
+  }, [newSession.lat, newSession.lng]);
+
+  const fetchClasses = async () => {
+    try {
+      const res = await api.get('/classes');
+      setClasses(res.data);
+      setNewSession((prev) => ({
+        ...prev,
+        class_id: prev.class_id || res.data?.[0]?.name || '',
+      }));
+    } catch (error) {
+      console.error('Failed to fetch classes', error);
+      toast.error('Khong the tai danh sach lop');
+    }
+  };
+
+  const fetchSessions = async () => {
+    setSessionsLoading(true);
+    try {
+      const res = await api.get('/attendance/sessions', {
+        params: {
+          classId: classFilter || undefined,
+          limit: 30,
+        },
+      });
+      setSessions(res.data);
+    } catch (error) {
+      console.error('Failed to fetch sessions', error);
+      toast.error('Khong the tai danh sach phien diem danh');
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const fetchSummary = async (sessionId: number, silent = false) => {
+    if (!silent) setSummaryLoading(true);
+    try {
+      const res = await api.get(`/attendance/sessions/${sessionId}/summary`);
+      setSummary(res.data);
+    } catch (error) {
+      console.error('Failed to fetch summary', error);
+      if (!silent) {
+        toast.error('Khong the tai thong ke phien diem danh');
+      }
+    } finally {
+      if (!silent) setSummaryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchClasses();
+    fetchSessions();
+    getCurrentLocation();
+  }, []);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [classFilter]);
+
+  useEffect(() => {
+    if (sessions.length === 0) {
+      setSelectedSessionId(null);
+      setSummary(null);
+      return;
+    }
+
+    const sessionStillExists = sessions.some((session) => session.id === selectedSessionId);
+    if (!selectedSessionId || !sessionStillExists) {
+      setSelectedSessionId(sessions[0].id);
+    }
+  }, [selectedSessionId, sessions]);
+
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    fetchSummary(selectedSessionId);
+  }, [selectedSessionId]);
+
+  useEffect(() => {
+    if (!selectedSession?.id || !selectedSession.isActive) return;
+    const interval = setInterval(() => {
+      void fetchSummary(selectedSession.id, true);
+      void fetchSessions();
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [selectedSession?.id, selectedSession?.isActive]);
+
+  const updateCoordinates = (lat: number, lng: number) => {
+    setNewSession((prev) => ({ ...prev, lat, lng }));
+  };
+
+  const applyGoogleMapsInput = () => {
+    const parsed = parseCoordinatesFromText(mapInput);
+    if (!parsed) {
+      toast.error('Khong doc duoc toa do tu du lieu da dan');
+      return;
+    }
+
+    updateCoordinates(parsed.lat, parsed.lng);
+    toast.success('Da ap dung toa do tu Google Maps');
+  };
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Trinh duyet khong ho tro dinh vi');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        updateCoordinates(pos.coords.latitude, pos.coords.longitude);
+        setGpsAccuracy(typeof pos.coords.accuracy === 'number' ? pos.coords.accuracy : null);
+        toast.success('Da lay vi tri hien tai');
+      },
+      () => toast.error('Khong the lay GPS. Vui long cap quyen hoac nhap link Google Maps'),
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      },
+    );
+  };
+
+  const handleCreateSession = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!newSession.class_id) {
+      toast.error('Vui long chon lop cho phien diem danh');
+      return;
+    }
+
+    if (!newSession.lat || !newSession.lng) {
+      toast.error('Vui long nhap vi tri GPS hoac Google Maps truoc khi tao phien');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      await api.post('/attendance/session', newSession);
+      toast.success('Da tao phien diem danh QR moi');
+      setNewSession((prev) => ({
+        ...prev,
+        title: '',
+        subject: '',
+      }));
+      await fetchSessions();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Khong the tao phien diem danh');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleEndSession = async (sessionId: number) => {
+    try {
+      await api.patch(`/attendance/sessions/${sessionId}/end`);
+      toast.success('Da ket thuc phien diem danh');
+      await fetchSessions();
+      if (selectedSessionId === sessionId) {
+        await fetchSummary(sessionId);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Khong the ket thuc phien');
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/30">
+        <h2 className="text-3xl font-extrabold text-slate-900">Quan ly diem danh QR theo lop</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-500">
+          Moi phien QR gan voi mot lop cu the. Sinh vien quet thanh cong khi nam trong ban kinh cua phien va
+          vuot qua doi chieu IP/toa do voi ho so xac minh dau tien luu trong database.
+        </p>
+      </div>
+
+      <div className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/30">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="rounded-xl bg-primary-50 p-3">
+            <QrCode className="h-6 w-6 text-primary-600" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-slate-800">Tao phien diem danh moi</h3>
+            <p className="text-sm text-slate-500">Chon lop, dat vi tri va ban kinh QR truoc khi bat dau.</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleCreateSession} className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Lop hoc</label>
+            <select
+              required
+              value={newSession.class_id}
+              onChange={(event) => setNewSession((prev) => ({ ...prev, class_id: event.target.value }))}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Chon lop</option>
+              {classes.map((classItem) => (
+                <option key={classItem.name} value={classItem.name}>
+                  {classItem.name} ({classItem.studentCount} SV)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <Calendar size={14} />
+              Ngay hoc
+            </label>
+            <input
+              type="date"
+              required
+              value={newSession.sessionDate}
+              onChange={(event) => setNewSession((prev) => ({ ...prev, sessionDate: event.target.value }))}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Ten phien / tiet hoc</label>
+            <input
+              type="text"
+              required
+              value={newSession.title}
+              onChange={(event) => setNewSession((prev) => ({ ...prev, title: event.target.value }))}
+              placeholder="VD: Tiet 1-3"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Mon hoc</label>
+            <input
+              type="text"
+              value={newSession.subject}
+              onChange={(event) => setNewSession((prev) => ({ ...prev, subject: event.target.value }))}
+              placeholder="VD: Cong nghe phan mem"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Ban kinh diem danh (m)</label>
+            <input
+              type="number"
+              required
+              min={10}
+              max={500}
+              value={newSession.radius}
+              onChange={(event) =>
+                setNewSession((prev) => ({ ...prev, radius: Number(event.target.value) || 0 }))
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <LinkIcon size={14} />
+              Link Google Maps hoac chuoi lat,lng
+            </label>
+            <div className="flex flex-col gap-3 lg:flex-row">
+              <input
+                type="text"
+                value={mapInput}
+                onChange={(event) => setMapInput(event.target.value)}
+                placeholder="Dan link Google Maps co toa do hoac chuoi 10.030243,105.768411"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <button
+                type="button"
+                onClick={applyGoogleMapsInput}
+                className="inline-flex items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-bold text-sky-700 transition hover:bg-sky-100"
+              >
+                Ap dung tu Maps
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Vi do</label>
+            <input
+              type="number"
+              min={-90}
+              max={90}
+              step="any"
+              value={newSession.lat || ''}
+              onChange={(event) => updateCoordinates(Number(event.target.value || 0), newSession.lng)}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 font-mono outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Kinh do</label>
+            <input
+              type="number"
+              min={-180}
+              max={180}
+              step="any"
+              value={newSession.lng || ''}
+              onChange={(event) => updateCoordinates(newSession.lat, Number(event.target.value || 0))}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 font-mono outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:col-span-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2 text-sm text-slate-600">
+              <div className="flex flex-wrap gap-6 font-mono">
+                <span>Lat: {newSession.lat ? newSession.lat.toFixed(6) : '--'}</span>
+                <span>Lng: {newSession.lng ? newSession.lng.toFixed(6) : '--'}</span>
+              </div>
+              <p>Do chinh xac GPS: <strong>{gpsAccuracy !== null ? `${Math.round(gpsAccuracy)} m` : 'Chua co du lieu'}</strong></p>
+              {previewGoogleMapsUrl && (
+                <a
+                  href={previewGoogleMapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-bold text-sky-700 hover:text-sky-800"
+                >
+                  <LinkIcon size={14} />
+                  Mo vi tri nay tren Google Maps
+                </a>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={getCurrentLocation}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-primary-400"
+            >
+              <Navigation className="h-4 w-4" />
+              Lay vi tri GPS
+            </button>
+          </div>
+
+          <button
+            type="submit"
+            disabled={creating}
+            className="w-full rounded-xl bg-primary-600 py-4 font-bold text-white shadow-lg shadow-primary-500/20 transition-all hover:bg-primary-700 disabled:opacity-50 md:col-span-2"
+          >
+            <span className="flex items-center justify-center gap-3">
+              {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
+              Bat dau phien diem danh
+            </span>
+          </button>
+        </form>
+      </div>
+
+      <div className="space-y-5 rounded-[2rem] border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/30">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-slate-800">Thong ke diem danh theo lop</h3>
+            <p className="text-sm text-slate-500">Chon lop va phien de xem ti le diem danh va danh sach sinh vien.</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <select
+              value={classFilter}
+              onChange={(event) => setClassFilter(event.target.value)}
+              className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Tat ca cac lop</option>
+              {classes.map((classItem) => (
+                <option key={classItem.name} value={classItem.name}>
+                  {classItem.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedSessionId || ''}
+              onChange={(event) => setSelectedSessionId(Number(event.target.value) || null)}
+              className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary-500"
+              disabled={sessions.length === 0}
+            >
+              <option value="">Chon phien</option>
+              {sessions.map((session) => (
+                <option key={session.id} value={session.id}>
+                  [{session.class_id}] {session.title} - {new Date(session.sessionDate).toLocaleDateString('vi-VN')}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {sessionsLoading ? (
+          <div className="rounded-3xl border border-slate-100 bg-slate-50 py-16 text-center text-slate-400">
+            <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin" />
+            Dang tai danh sach phien diem danh...
+          </div>
+        ) : sessions.length === 0 ? (
+          <div className="rounded-3xl border-2 border-dashed border-slate-200 py-16 text-center text-slate-400">
+            <QrCode className="mx-auto mb-4 h-16 w-16 opacity-20" />
+            <p className="font-medium">Chua co phien diem danh nao phu hop bo loc hien tai</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <div className="space-y-4">
+              {selectedSession && (
+                <div className="rounded-[2rem] border border-slate-100 bg-slate-50 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="mb-2 inline-flex rounded-full bg-primary-50 px-3 py-1 text-xs font-black uppercase tracking-wider text-primary-700">
+                        {selectedSession.class_id}
+                      </div>
+                      <h4 className="text-xl font-bold text-slate-800">{selectedSession.title}</h4>
+                      <p className="mt-1 text-sm text-slate-500">{selectedSession.subject || 'Khong co mon hoc'}</p>
+                    </div>
+                    <div
+                      className={`rounded-full px-3 py-1 text-xs font-bold ${
+                        selectedSession.isActive
+                          ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border border-slate-200 bg-white text-slate-500'
+                      }`}
+                    >
+                      {selectedSession.isActive ? 'Dang hoat dong' : 'Da ket thuc'}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-2 text-sm text-slate-600">
+                    <p className="flex items-center gap-2">
+                      <Calendar size={14} className="text-primary-500" />
+                      {new Date(selectedSession.sessionDate).toLocaleDateString('vi-VN')}
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <MapPin size={14} className="text-primary-500" />
+                      Ban kinh cho phep: {selectedSession.radius}m
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <Users size={14} className="text-primary-500" />
+                      Da diem danh: {selectedSession.attendeeCount}
+                    </p>
+                  </div>
+
+                  {selectedSession.isActive && (
+                    <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-inner">
+                      <QRCodeSVG value={selectedSession.qrToken} size={190} level="H" includeMargin />
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => fetchSummary(selectedSession.id)}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700"
+                    >
+                      <RefreshCw size={14} />
+                      Lam moi
+                    </button>
+                    {selectedSession.isActive && (
+                      <button
+                        type="button"
+                        onClick={() => handleEndSession(selectedSession.id)}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700"
+                      >
+                        <XCircle size={14} />
+                        Ket thuc
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-5">
+              {summaryLoading || !summary ? (
+                <div className="rounded-[2rem] border border-slate-100 bg-slate-50 py-20 text-center text-slate-400">
+                  <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin" />
+                  Dang tai thong ke phien...
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                    <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Da diem danh</p>
+                      <p className="mt-2 text-3xl font-black text-emerald-700">{summary.stats.checkedIn}</p>
+                    </div>
+                    <div className="rounded-3xl border border-red-100 bg-red-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-red-600">Chua diem danh</p>
+                      <p className="mt-2 text-3xl font-black text-red-700">{summary.stats.absentCount}</p>
+                    </div>
+                    <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Tong sinh vien</p>
+                      <p className="mt-2 text-3xl font-black text-blue-700">{summary.stats.totalStudents}</p>
+                    </div>
+                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Ty le</p>
+                      <p className="mt-2 text-3xl font-black text-slate-700">{summary.stats.attendanceRate}%</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <div className="rounded-3xl border border-slate-100 bg-white p-4">
+                      <p className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <ShieldCheck size={16} className="text-primary-500" />
+                        Ho so lan dau
+                      </p>
+                      <p className="mt-2 text-2xl font-black text-slate-800">{summary.stats.baselineCreatedCount}</p>
+                      <p className="text-sm text-slate-500">So sinh vien duoc luu moc IP/toa do lan dau trong phien nay.</p>
+                    </div>
+                    <div className="rounded-3xl border border-slate-100 bg-white p-4">
+                      <p className="text-sm font-bold text-slate-700">Xac minh IP</p>
+                      <p className="mt-2 text-2xl font-black text-slate-800">{summary.stats.verifiedIpCount}</p>
+                      <p className="text-sm text-slate-500">So lan diem danh hop le theo IP ho so.</p>
+                    </div>
+                    <div className="rounded-3xl border border-slate-100 bg-white p-4">
+                      <p className="text-sm font-bold text-slate-700">Xac minh vi tri</p>
+                      <p className="mt-2 text-2xl font-black text-slate-800">{summary.stats.verifiedLocationCount}</p>
+                      <p className="text-sm text-slate-500">So lan diem danh hop le theo toa do ho so.</p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-sm">
+                    <div className="border-b border-slate-100 px-5 py-4">
+                      <h4 className="font-bold text-slate-800">Danh sach sinh vien cua lop {summary.session.class_id}</h4>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-bold text-slate-500">Sinh vien</th>
+                            <th className="px-4 py-3 text-left font-bold text-slate-500">Trang thai</th>
+                            <th className="px-4 py-3 text-left font-bold text-slate-500">Thoi gian</th>
+                            <th className="px-4 py-3 text-left font-bold text-slate-500">Xac minh</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {summary.students.map((student) => (
+                            <tr key={student.id} className="align-top">
+                              <td className="px-4 py-4">
+                                <div>
+                                  <p className="font-semibold text-slate-800">{student.name}</p>
+                                  <p className="text-xs font-mono text-primary-600">{student.student_code}</p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                {student.attendance ? (
+                                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                                    <CheckCircle2 size={14} />
+                                    Da diem danh
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+                                    <XCircle size={14} />
+                                    Chua diem danh
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-4 text-slate-500">
+                                {student.attendance
+                                  ? new Date(student.attendance.checkedInAt).toLocaleString('vi-VN')
+                                  : '--'}
+                              </td>
+                              <td className="px-4 py-4">
+                                {student.attendance ? (
+                                  <div className="space-y-1 text-xs text-slate-600">
+                                    <p>{student.attendance.baselineCreated ? 'Lan dau luu ho so' : 'Khop ho so da luu'}</p>
+                                    <p>IP: {student.attendance.verifiedIp ? 'Hop le' : 'Khong hop le'}</p>
+                                    <p>Vi tri: {student.attendance.verifiedLocation ? 'Hop le' : 'Khong hop le'}</p>
+                                    {student.attendance.sessionDistance !== null && student.attendance.sessionDistance !== undefined && (
+                                      <p>Lech tam phien: {Math.round(student.attendance.sessionDistance)}m</p>
+                                    )}
+                                    {student.attendance.profileDistance !== null && student.attendance.profileDistance !== undefined && (
+                                      <p>Lech ho so: {Math.round(student.attendance.profileDistance)}m</p>
+                                    )}
+                                  </div>
+                                ) : student.profile ? (
+                                  <div className="space-y-1 text-xs text-slate-500">
+                                    <p>Da co ho so xac minh</p>
+                                    <p>Check-in hop le: {student.profile.totalVerifiedCheckIns}</p>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs italic text-slate-400">Chua co ho so QR</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default QRAttendanceManager;
