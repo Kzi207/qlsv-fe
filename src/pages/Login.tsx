@@ -4,7 +4,6 @@ import { useAuthStore } from '../store/useAuthStore';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 const Login = () => {
   const [username, setUsername] = useState('');
