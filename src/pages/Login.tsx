@@ -173,8 +173,8 @@ const Login = () => {
         <div className="absolute inset-0 z-0">
           <img 
             alt="CTUT Campus Building" 
-            className="w-full h-full object-cover object-[85%_top]" 
-            src="/bg-campus.png" 
+            className="w-full h-full object-cover object-[300%_top]" 
+            src="ChatGPT Image 17_42_48 20 thg 5, 2026.png" 
           />
           <div className="absolute inset-0 bg-overlay z-10"></div>
           
