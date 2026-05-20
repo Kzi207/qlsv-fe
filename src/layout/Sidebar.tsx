@@ -36,9 +36,13 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
     {
       label: 'Hoạt động',
       items: [
-        { name: 'Điểm danh QR', path: isAdmin || isBch ? '/attendance/manage' : '/attendance/scan', icon: QrCode, roles: ['STUDENT', 'ADMIN', 'BCH'] },
+        { name: 'Điểm danh QR', path: '/attendance/scan', icon: QrCode, roles: ['STUDENT'] },
+        { name: 'Điểm danh QR học phần', path: '/attendance/manage/class', icon: QrCode, roles: ['ADMIN', 'BCH'] },
+        { name: 'Điểm danh hoạt động', path: '/attendance/manage/activity', icon: QrCode, roles: ['ADMIN', 'BCH'] },
         { name: 'Nộp phiếu DRL', path: '/training/evaluation/self', icon: ClipboardCheck, roles: ['STUDENT'] },
+        { name: 'Nộp minh chứng', path: '/evidence/submit', icon: Award, roles: ['STUDENT'] },
         { name: 'Quản lý DRL', path: '/drl', icon: ClipboardCheck, roles: ['ADMIN', 'BCH'] },
+        { name: 'Duyệt minh chứng', path: '/evidence/review', icon: Award, roles: ['ADMIN', 'BCH'] },
       ]
     },
     {
@@ -53,6 +57,7 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
       items: [
         { name: 'Sinh viên', path: '/students', icon: Users, roles: ['ADMIN', 'BCH'] },
         { name: 'Lớp học', path: '/classes', icon: BookOpen, roles: ['ADMIN', 'BCH'] },
+        { name: 'Sự kiện', path: '/events', icon: Calendar, roles: ['ADMIN', 'BCH'] },
         { name: 'Học kỳ', path: '/semesters', icon: Calendar, roles: ['ADMIN', 'BCH'] },
         { name: 'Tài khoản', path: '/accounts', icon: UserPlus, roles: ['ADMIN'] },
         { name: 'Ban Cán Sự', path: '/bch', icon: UserCheck, roles: ['ADMIN'] },
@@ -82,13 +87,18 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
       <aside className={`fixed top-0 left-0 z-50 h-screen w-80 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 bg-white border-r border-slate-100 shadow-2xl lg:shadow-none`}>
         <div className="flex flex-col h-full">
           {/* Logo Section */}
-          <div className="p-8 pb-4 shrink-0">
-             <div className="flex items-center gap-4 group cursor-pointer">
-                <div className="h-14 w-14 rounded-2xl flex items-center justify-center overflow-hidden transition-transform group-hover:scale-110 duration-500 shadow-lg shadow-slate-200/50">
+          <div className="p-6 pb-3 shrink-0 border-b border-slate-50">
+             <div className="flex items-center gap-3.5 group cursor-pointer">
+                <div className="h-14 w-14 shrink-0 rounded-2xl flex items-center justify-center overflow-hidden transition-transform group-hover:scale-110 duration-500 shadow-md shadow-slate-200/50">
                    <img src="/logo-qlsv.png" alt="Logo" className="w-full h-full object-contain" />
                 </div>
                 <div className="flex-1 min-w-0">
-                   <p className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-800 leading-tight">Hệ thống quản lý sinh viên</p>
+                   <h1 className="text-[11px] font-extrabold uppercase tracking-tight text-slate-800 leading-tight">
+                     ĐH Kỹ Thuật - Công Nghệ Cần Thơ
+                   </h1>
+                   <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider mt-1 bg-blue-50/70 inline-block px-2 py-0.5 rounded-md">
+                     Khoa Kỹ Thuật Cơ Khí
+                   </p>
                 </div>
              </div>
           </div>

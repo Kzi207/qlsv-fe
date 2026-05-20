@@ -11,6 +11,12 @@ const ABSOLUTE_URL_PATTERN = /^https?:\/\//i;
 const isAbsoluteUrl = (value: string) => ABSOLUTE_URL_PATTERN.test(value);
 const isR2Path = (value: string) => value.startsWith('r2:');
 
+const toEvidenceKey = (value: string) =>
+  String(value || '')
+    .replace(/^\/+/, '')
+    .replace(/^uploads\/evidence\//i, '')
+    .replace(/\\/g, '/');
+
 export const normalizeEvidenceFile = (file: unknown): EvidenceFile | null => {
   if (!file) return null;
 
@@ -65,11 +71,9 @@ export const getEvidenceUrl = (file: EvidenceFile | string) => {
   if (!normalized) return '';
   if (normalized.url && isAbsoluteUrl(normalized.url)) return normalized.url;
   if (isAbsoluteUrl(normalized.path)) return normalized.path;
-  if (isR2Path(normalized.path)) {
-    const key = normalized.path.slice(3);
-    return `${API_BASE}/api/training/evidence/${encodeURIComponent(key)}`;
-  }
-  return `${API_BASE}/${normalized.path.replace(/^\/+/, '')}`;
+
+  const key = isR2Path(normalized.path) ? normalized.path : toEvidenceKey(normalized.path);
+  return `${API_BASE}/api/training/evidence/${encodeURIComponent(key)}`;
 };
 
 export const isPdfEvidence = (file: EvidenceFile | string) => {

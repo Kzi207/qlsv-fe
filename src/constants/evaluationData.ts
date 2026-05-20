@@ -1,16 +1,4 @@
-export interface Section {
-  id: string;
-  title: string;
-  maxPoints: number;
-  criteria: {
-    id: string;
-    content: string;
-    maxPoints: number;
-    guide: string;
-    type: 'number' | 'boolean';
-    unit?: string;
-  }[];
-}
+import type { Section } from '../types';
 
 export const EVALUATION_DATA: Section[] = [
   {

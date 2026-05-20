@@ -111,7 +111,8 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401) {
       writeStoredCsrfToken('');
-      if (window.location.pathname !== '/login') {
+      const isPublicPath = window.location.pathname === '/login' || window.location.pathname.startsWith('/dangky');
+      if (!isPublicPath) {
         window.location.href = '/login';
       }
     }

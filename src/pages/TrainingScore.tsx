@@ -69,7 +69,7 @@ const TrainingScore = () => {
     setSelectedStudent(student);
     try {
       const res = await api.get(`/training/student/${student.id}`);
-      const score = res.data.find((s: any) => s.semester === semester);
+      const score = res.data.find((s: any) => (s.semester_id || s.semester?.name || s.semester) === semester);
       if (score) {
         setScores({
           y_thuc: score.y_thuc,
@@ -152,7 +152,7 @@ const TrainingScore = () => {
                     <div className="flex justify-between items-center">
                        <div className="flex flex-col">
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Học kỳ</span>
-                          <span className="text-lg font-black text-blue-600 uppercase tracking-tight">{s.semester}</span>
+                          <span className="text-lg font-black text-blue-600 uppercase tracking-tight">{s.semester_id || s.semester?.name || s.semester}</span>
                        </div>
                        <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider border shadow-sm ${getRank(s.total).color} ${getRank(s.total).border}`}>
                           {getRank(s.total).label}

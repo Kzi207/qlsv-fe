@@ -166,14 +166,14 @@ const Attendance = () => {
                   className="card-premium card-premium-hover p-3 md:p-4 flex items-center gap-4 md:gap-6"
                 >
                   <div className="hidden md:flex flex-col items-center justify-center border-r border-slate-100 pr-6 min-w-[100px]">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{new Date(record.created_at).toLocaleDateString('vi-VN', { weekday: 'short' })}</p>
-                    <p className="text-xl font-black text-slate-900">{new Date(record.created_at).getDate()}</p>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tháng {new Date(record.created_at).getMonth() + 1}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{new Date(record.date || record.createdAt).toLocaleDateString('vi-VN', { weekday: 'short' })}</p>
+                    <p className="text-xl font-black text-slate-900">{new Date(record.date || record.createdAt).getDate()}</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tháng {new Date(record.date || record.createdAt).getMonth() + 1}</p>
                   </div>
 
                   <div className="flex-1 min-w-0 space-y-0.5">
                     <div className="flex items-center gap-2 md:hidden mb-1">
-                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{new Date(record.created_at).toLocaleDateString('vi-VN')}</span>
+                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{new Date(record.date || record.createdAt).toLocaleDateString('vi-VN')}</span>
                     </div>
                     <h4 className="text-xs md:text-sm font-black text-slate-800 truncate">{record.session?.subject || record.session?.title || 'Buổi học'}</h4>
                     <p className="text-[9px] md:text-xs font-medium text-slate-400 flex items-center gap-1">

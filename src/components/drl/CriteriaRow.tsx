@@ -1,13 +1,18 @@
 import React from 'react';
-import { Check, HelpCircle, X } from 'lucide-react';
+import { Check, HelpCircle, X, Eye } from 'lucide-react';
 import FileUpload from './FileUpload';
 import ScoreBox from './ScoreBox';
 
 interface CriteriaRowProps {
   criterion: any;
   studentScore?: number;
+  studentInputMax?: number;
+  studentPlaceholder?: string;
   adminScore?: number;
   evidence: any[];
+  customEvidence?: any[];
+  onAddCustomEvidence?: () => void;
+  activities?: Array<{ activityName: string; points: number; checkedInAt: string }>;
   isAdminMode?: boolean;
   onStudentScoreChange?: (val?: number) => void;
   onAdminScoreChange?: (val?: number) => void;
@@ -18,8 +23,12 @@ interface CriteriaRowProps {
 const CriteriaRow: React.FC<CriteriaRowProps> = ({
   criterion,
   studentScore,
+  studentInputMax,
+  studentPlaceholder,
   adminScore,
   evidence,
+  customEvidence = [],
+  activities = [],
   isAdminMode,
   onStudentScoreChange,
   onAdminScoreChange,
@@ -58,7 +67,8 @@ const CriteriaRow: React.FC<CriteriaRowProps> = ({
                 label="Tự"
                 value={studentScore}
                 onChange={onStudentScoreChange}
-                max={criterion.maxPoints}
+                max={studentInputMax ?? criterion.maxPoints}
+                placeholder={studentPlaceholder}
                 unit=""
                 readOnly={isAdminMode}
                 className="!w-9 !p-0 border-none shadow-none text-center text-xs"
@@ -75,6 +85,53 @@ const CriteriaRow: React.FC<CriteriaRowProps> = ({
               />
            </div>
         </div>
+
+
+        {activities.length > 0 && (
+          <div className="space-y-1.5 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2">
+            <p className="text-[9px] font-black uppercase tracking-widest text-emerald-700">Hoat dong da cong diem</p>
+            {activities.map((activity, idx) => (
+              <p key={`${activity.checkedInAt}-${idx}`} className="text-[10px] font-semibold text-emerald-800">
+                +{activity.points}d - {activity.activityName}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {customEvidence && customEvidence.length > 0 && (
+          <div className="space-y-1.5 rounded-xl border border-slate-100 bg-slate-50/50 p-2">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Minh chứng hoạt động đã nộp</p>
+            <div className="space-y-1.5">
+              {customEvidence.map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-100 gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                        item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                        item.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                        'bg-amber-50 text-amber-600 border border-amber-100'
+                      }`}>
+                        {item.status === 'APPROVED' ? 'Đã duyệt' : item.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+                      </span>
+                      <span className="text-[10px] font-black text-slate-700">+{item.points}đ</span>
+                    </div>
+                    <p className="text-[11px] font-bold text-slate-800 truncate">{item.activityName}</p>
+                  </div>
+                  {item.files && item.files.length > 0 && (
+                    <button
+                      onClick={() => onViewEvidence?.(item.files[0].path)}
+                      className="p-1 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-slate-500 hover:text-blue-600 transition-all shrink-0"
+                    >
+                      <Eye size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+
 
         {isAdminMode && (
           <div className="flex gap-1.5 pt-0.5">
@@ -124,6 +181,54 @@ const CriteriaRow: React.FC<CriteriaRowProps> = ({
             disabled={isAdminMode}
             className="!mt-2"
           />
+
+          {activities.length > 0 && (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-700">Hoat dong da cong diem</p>
+              <div className="mt-1 space-y-1">
+                {activities.map((activity, idx) => (
+                  <p key={`${activity.checkedInAt}-${idx}`} className="text-[11px] font-semibold text-emerald-800">
+                    +{activity.points}d - {activity.activityName}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {customEvidence && customEvidence.length > 0 && (
+            <div className="rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Minh chứng hoạt động đã nộp</p>
+              <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+                {customEvidence.map((item: any) => (
+                  <div key={item.id} className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-100 gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                          item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                          item.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                          'bg-amber-50 text-amber-600 border border-amber-100'
+                        }`}>
+                          {item.status === 'APPROVED' ? 'Đã duyệt' : item.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+                        </span>
+                        <span className="text-[10px] font-black text-slate-700">+{item.points}đ</span>
+                      </div>
+                      <p className="text-[11px] font-bold text-slate-800 truncate" title={item.activityName}>{item.activityName}</p>
+                    </div>
+                    {item.files && item.files.length > 0 && (
+                      <button
+                        onClick={() => onViewEvidence?.(item.files[0].path)}
+                        className="p-1 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-slate-500 hover:text-blue-600 transition-all shrink-0"
+                      >
+                        <Eye size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+
         </div>
 
         {/* Score & Actions Column */}
@@ -133,7 +238,8 @@ const CriteriaRow: React.FC<CriteriaRowProps> = ({
                 label="Tự chấm"
                 value={studentScore}
                 onChange={onStudentScoreChange}
-                max={criterion.maxPoints}
+                max={studentInputMax ?? criterion.maxPoints}
+                placeholder={studentPlaceholder}
                 unit="đ"
                 readOnly={isAdminMode}
                 className="bg-white !p-2 !rounded-xl border-none shadow-none text-xs"
@@ -149,6 +255,7 @@ const CriteriaRow: React.FC<CriteriaRowProps> = ({
                 className={`bg-white !p-2 !rounded-xl border-none shadow-none text-xs ${isAdminMode ? 'ring-1 ring-blue-500/10' : ''}`}
               />
            </div>
+
 
            {isAdminMode && (
              <div className="flex flex-col gap-1 w-10">

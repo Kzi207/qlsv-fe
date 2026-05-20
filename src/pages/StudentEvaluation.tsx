@@ -5,7 +5,7 @@ import api from '../api/axios';
 import DetailedEvaluationForm from '../components/DetailedEvaluationForm';
 import { useAuthStore } from '../store/useAuthStore';
 
-const parseDetails = (raw: any): Record<string, { score: number; files: any[] }> => {
+const parseDetails = (raw: any): Record<string, { score: number; files: any[]; activities?: any[] }> => {
   let parsed = raw;
   for (let i = 0; i < 3; i += 1) {
     if (typeof parsed !== 'string') break;
@@ -16,7 +16,7 @@ const parseDetails = (raw: any): Record<string, { score: number; files: any[] }>
     }
   }
   if (!parsed || typeof parsed !== 'object') return {};
-  return parsed as Record<string, { score: number; files: any[] }>;
+  return parsed as Record<string, { score: number; files: any[]; activities?: any[] }>;
 };
 
 export default function StudentEvaluation() {
@@ -25,7 +25,7 @@ export default function StudentEvaluation() {
   const [semesterOptions, setSemesterOptions] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<any>(null);
-  const [savedDetails, setSavedDetails] = useState<Record<string, { score: number; files: any[] }> | null>(null);
+  const [savedDetails, setSavedDetails] = useState<Record<string, { score: number; files: any[]; activities?: any[] }> | null>(null);
   const [savedAdminDetails, setSavedAdminDetails] = useState<Record<string, number> | null>(null);
   const [submissionWindow, setSubmissionWindow] = useState<{ isOpen: boolean; deadline: string | null } | null>(null);
   const [checkingWindow, setCheckingWindow] = useState(false);

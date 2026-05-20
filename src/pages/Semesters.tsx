@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { Plus, Calendar, Trash2, Loader2, Edit2, X, Globe, Lock, Clock } from 'lucide-react';
+import { Plus, Calendar, Trash2, Loader2, Edit2, X, Globe, Lock, Clock, AlertTriangle } from 'lucide-react';
 
 
 const toDateTimeInputValue = (value?: string | null) => {
@@ -18,6 +18,11 @@ const Semesters = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingSemester, setEditingSemester] = useState<any | null>(null);
+
+  const [dangerSemester, setDangerSemester] = useState<string>('');
+  const [confirmStep, setConfirmStep] = useState<number>(0);
+  const [typedSemesterName, setTypedSemesterName] = useState<string>('');
+  const [deletingData, setDeletingData] = useState<boolean>(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -70,12 +75,31 @@ const Semesters = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim()) return toast.error('Tên học kỳ không được để trống');
+    const name = formData.name.trim().toUpperCase();
+    if (!name) return toast.error('Tên học kỳ không được để trống');
+    
+    // 1. Check for duplicates
+    const isDuplicate = semesters.some(s => s.name === name && (!editingSemester || editingSemester.name !== name));
+    if (isDuplicate) return toast.error('Học kỳ này đã tồn tại trong hệ thống');
+
+    // 2. Validate date range
+    if (formData.startDate && formData.endDate) {
+      const start = new Date(formData.startDate).getTime();
+      const end = new Date(formData.endDate).getTime();
+      if (start > end) {
+        return toast.error('Thời gian bắt đầu phải nhỏ hơn hoặc bằng thời gian kết thúc');
+      }
+    }
+
+    // 3. Validate class selection for class-scoped semesters
+    if (!formData.isGlobal && formData.classNames.length === 0) {
+      return toast.error('Học kỳ áp dụng theo lớp phải chọn ít nhất 1 lớp');
+    }
     
     try {
       if (editingSemester) {
         await api.put(`/semesters/${editingSemester.name}`, {
-          newName: formData.name.trim().toUpperCase(),
+          newName: name,
           startDate: formData.startDate || null,
           endDate: formData.endDate || null,
           isGlobal: formData.isGlobal,
@@ -84,7 +108,7 @@ const Semesters = () => {
         toast.success('Đã cập nhật học kỳ');
       } else {
         await api.post('/semesters', {
-          name: formData.name.trim().toUpperCase(),
+          name: name,
           startDate: formData.startDate || null,
           endDate: formData.endDate || null,
           isGlobal: formData.isGlobal,
@@ -108,6 +132,26 @@ const Semesters = () => {
       fetchData();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Không thể xóa học kỳ');
+    }
+  };
+
+  const handleDangerDelete = async () => {
+    if (typedSemesterName !== dangerSemester) {
+      return toast.error('Tên học kỳ xác nhận không khớp');
+    }
+    
+    setDeletingData(true);
+    try {
+      const res = await api.post(`/semesters/${dangerSemester}/danger-zone/clear-all`);
+      toast.success(res.data?.message || `Đã xóa sạch dữ liệu học kỳ ${dangerSemester}`);
+      setDangerSemester('');
+      setConfirmStep(0);
+      setTypedSemesterName('');
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Không thể xóa sạch dữ liệu học kỳ');
+    } finally {
+      setDeletingData(false);
     }
   };
 
@@ -215,6 +259,108 @@ const Semesters = () => {
           )}
         </div>
       )}
+
+      {/* Vùng nguy hiểm (Danger Zone) */}
+      <div className="mt-12 bg-rose-50/50 backdrop-blur-sm border border-rose-100 rounded-[2rem] p-6 md:p-8 space-y-6">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-600 shrink-0 shadow-inner">
+            <AlertTriangle size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-rose-950 tracking-tight">Vùng Nguy Hiểm (Danger Zone)</h3>
+            <p className="text-slate-500 text-xs md:text-sm font-medium mt-1">
+              Nơi đây cho phép xóa toàn bộ dữ liệu điểm rèn luyện, lịch sử điểm danh, các tập tin minh chứng hình ảnh liên quan đến một học kỳ. Hành động này không thể khôi phục.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white border border-rose-100/50 rounded-2xl p-5 md:p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Chọn học kỳ cần xóa sạch</label>
+              <select
+                value={dangerSemester}
+                onChange={(e) => {
+                  setDangerSemester(e.target.value);
+                  setConfirmStep(0);
+                  setTypedSemesterName('');
+                }}
+                className="w-full px-5 py-3.5 rounded-xl border border-slate-200 outline-none focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 font-bold text-slate-900 transition-all bg-slate-50 hover:bg-slate-100/50"
+              >
+                <option value="">-- Chọn học kỳ --</option>
+                {semesters.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {dangerSemester && confirmStep === 0 && (
+              <button
+                type="button"
+                onClick={() => setConfirmStep(1)}
+                className="w-full px-6 py-4 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-rose-500/20 active:scale-95 text-center cursor-pointer"
+              >
+                Xóa toàn bộ dữ liệu & hình ảnh
+              </button>
+            )}
+          </div>
+
+          {confirmStep === 1 && dangerSemester && (
+            <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200/50 animate-in slide-in-from-top-2 duration-300 space-y-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-black text-rose-800 uppercase tracking-widest">Xác nhận lần 1: Nhập lại tên học kỳ</span>
+                <p className="text-slate-600 text-xs font-medium">
+                  Vui lòng nhập chính xác cụm từ <span className="font-extrabold text-rose-600 bg-rose-100/50 px-2 py-0.5 rounded border border-rose-200">{dangerSemester}</span> để xác nhận hành động hủy diệt dữ liệu này.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                <input
+                  type="text"
+                  placeholder={`Nhập đúng: ${dangerSemester}`}
+                  value={typedSemesterName}
+                  onChange={(e) => setTypedSemesterName(e.target.value)}
+                  className="w-full px-5 py-3.5 rounded-xl border border-rose-200 outline-none focus:ring-4 focus:ring-rose-500/20 focus:border-rose-500 font-black text-rose-900 transition-all uppercase placeholder:normal-case"
+                />
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmStep(0);
+                      setTypedSemesterName('');
+                    }}
+                    className="flex-1 px-4 py-3.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={typedSemesterName !== dangerSemester || deletingData}
+                    onClick={handleDangerDelete}
+                    className={`flex-[2] px-4 py-3.5 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      typedSemesterName === dangerSemester && !deletingData
+                        ? 'bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-500/25 active:scale-95'
+                        : 'bg-slate-300 cursor-not-allowed text-slate-400'
+                    }`}
+                  >
+                    {deletingData ? (
+                      <>
+                        <Loader2 className="animate-spin w-4 h-4 shrink-0" />
+                        Đang xóa...
+                      </>
+                    ) : (
+                      'Xác nhận lần 2: Xóa vĩnh viễn'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Add/Edit Modal */}
       {showModal && (

@@ -23,6 +23,8 @@ export default {
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',
         'slide-up': 'slideUp 0.5s ease-out',
+        'laser-scan': 'laserScan 2.5s infinite linear',
+        'infinite-loading': 'infiniteLoading 1.5s infinite linear',
       },
       keyframes: {
         fadeIn: {
@@ -32,6 +34,14 @@ export default {
         slideUp: {
           '0%': { transform: 'translateY(20px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        laserScan: {
+          '0%, 100%': { transform: 'translateY(0)', opacity: '0.4' },
+          '50%': { transform: 'translateY(240px)', opacity: '1' },
+        },
+        infiniteLoading: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(200%)' },
         },
       },
     },

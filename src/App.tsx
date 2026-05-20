@@ -14,6 +14,8 @@ import QRAttendanceManager from './pages/QRAttendanceManager';
 import QRScannerCheckIn from './pages/QRScannerCheckIn';
 import RoleRoute from './components/RoleRoute';
 import StudentEvaluation from './pages/StudentEvaluation';
+import StudentEvidence from './pages/StudentEvidence';
+import AdminEvidenceReview from './pages/AdminEvidenceReview';
 import AccountManagement from './pages/AccountManagement';
 import AdminDRLManagement from './pages/AdminDRLManagement';
 import Classes from './pages/Classes';
@@ -22,6 +24,8 @@ import TrainingScoreApproval from './pages/TrainingScoreApproval';
 import TrainingScoreDetail from './pages/TrainingScoreDetail';
 import BCHManagement from './pages/BCHManagement';
 import Profile from './pages/Profile';
+import PublicEventRegister from './pages/PublicEventRegister';
+import EventManagement from './pages/EventManagement';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, authInitialized } = useAuthStore();
@@ -51,6 +55,10 @@ function App() {
             authInitialized && isAuthenticated ? <Navigate to="/" /> : <Login />
           }
         />
+        
+        {/* STANDALONE PUBLIC EVENT REGISTRATION ROUTE */}
+        <Route path="/dangky" element={<PublicEventRegister />} />
+
         <Route
           path="/"
           element={
@@ -67,16 +75,20 @@ function App() {
           <Route path="training/approval/:id" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><TrainingScoreDetail /></RoleRoute>} />
           <Route path="evaluation/:studentId" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><EvaluationPage /></RoleRoute>} />
           <Route path="classes" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><Classes /></RoleRoute>} />
+          <Route path="events" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><EventManagement /></RoleRoute>} />
           <Route path="semesters" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><Semesters /></RoleRoute>} />
           <Route path="accounts" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><AccountManagement /></RoleRoute>} />
-          <Route path="attendance/manage" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><QRAttendanceManager /></RoleRoute>} />
+          <Route path="attendance/manage/class" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><QRAttendanceManager type="QR_CLASS" /></RoleRoute>} />
+          <Route path="attendance/manage/activity" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><QRAttendanceManager type="ACTIVITY" /></RoleRoute>} />
           <Route path="training/approval" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><TrainingScoreApproval /></RoleRoute>} />
+          <Route path="evidence/review" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><AdminEvidenceReview /></RoleRoute>} />
 
           {/* ADMIN ONLY ROUTES */}
           <Route path="bch" element={<RoleRoute allowedRoles={['ADMIN']}><BCHManagement /></RoleRoute>} />
 
           {/* STUDENT ONLY ROUTES */}
           <Route path="training/evaluation/self" element={<RoleRoute allowedRoles={['STUDENT']}><StudentEvaluation /></RoleRoute>} />
+          <Route path="evidence/submit" element={<RoleRoute allowedRoles={['STUDENT']}><StudentEvidence /></RoleRoute>} />
 
           {/* SHARED ROUTES */}
           <Route path="profile" element={<Profile />} />

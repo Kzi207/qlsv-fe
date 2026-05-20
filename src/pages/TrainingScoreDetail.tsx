@@ -18,6 +18,7 @@ import {
   type EvidenceFile,
   normalizeEvidenceList,
 } from '../utils/evidence';
+import { normalizeTrainingActivities } from '../utils/trainingActivities';
 import PreviewModal from '../components/drl/PreviewModal';
 
 type PopupState = {
@@ -48,6 +49,9 @@ const TrainingScoreDetail = () => {
   const [savingStatus, setSavingStatus] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [adminScores, setAdminScores] = useState<Record<string, number>>({});
   const [adminNotes, setAdminNotes] = useState('');
+  const [reviewEvidence, setReviewEvidence] = useState<{ criterionId: string; item: any } | null>(null);
+  const [reviewPoints, setReviewPoints] = useState(0);
+  const [reviewTargetCrit, setReviewTargetCrit] = useState('');
   const [evidencePopup, setEvidencePopup] = useState<PopupState>(null);
 
   useEffect(() => {
@@ -102,6 +106,7 @@ const TrainingScoreDetail = () => {
     admin_hoat_dong: calculateSectionTotal(EVALUATION_DATA[1], adminScores) + calculateSectionTotal(EVALUATION_DATA[2], adminScores),
     admin_ky_luat: calculateSectionTotal(EVALUATION_DATA[3], adminScores) + calculateSectionTotal(EVALUATION_DATA[4], adminScores),
     admin_notes: adminNotes,
+    details: data?.details,
     criteria_meta: EVALUATION_DATA.flatMap((section) =>
       section.criteria.map((criterion) => ({
         id: criterion.id,
@@ -132,6 +137,68 @@ const TrainingScoreDetail = () => {
     } finally {
       setSavingStatus(null);
     }
+  };
+
+  const handleReviewDecision = (decision: 'APPROVED' | 'REJECTED') => {
+    if (!reviewEvidence || !data) return;
+    const { criterionId: originalCritId, item } = reviewEvidence;
+
+    // Deep clone details to trigger React state updates accurately
+    const updatedDetails = JSON.parse(JSON.stringify(data.details || {}));
+
+    const origCustomList = updatedDetails[originalCritId]?.customEvidence || [];
+    const itemIndex = origCustomList.findIndex((x: any) => x.id === item.id);
+
+    if (itemIndex === -1) {
+      toast.error('Không tìm thấy thông tin minh chứng cần duyệt');
+      return;
+    }
+
+    if (decision === 'APPROVED') {
+      // Mark original customEvidence as approved
+      origCustomList[itemIndex].status = 'APPROVED';
+      origCustomList[itemIndex].points = reviewPoints;
+      origCustomList[itemIndex].targetCriterionId = reviewTargetCrit;
+
+      // Add files and activities to target criterion
+      if (!updatedDetails[reviewTargetCrit]) {
+        updatedDetails[reviewTargetCrit] = { score: 0, files: [], activities: [], customEvidence: [] };
+      }
+      if (!updatedDetails[reviewTargetCrit].files) {
+        updatedDetails[reviewTargetCrit].files = [];
+      }
+      updatedDetails[reviewTargetCrit].files = [
+        ...updatedDetails[reviewTargetCrit].files,
+        ...(item.files || [])
+      ];
+
+      if (!updatedDetails[reviewTargetCrit].activities) {
+        updatedDetails[reviewTargetCrit].activities = [];
+      }
+      updatedDetails[reviewTargetCrit].activities.push({
+        source: 'CUSTOM_EVIDENCE',
+        activityName: item.activityName,
+        points: reviewPoints,
+        checkedInAt: new Date().toISOString()
+      });
+
+      // Update score state
+      setAdminScores((prev) => ({
+        ...prev,
+        [reviewTargetCrit]: reviewPoints
+      }));
+    } else {
+      origCustomList[itemIndex].status = 'REJECTED';
+    }
+
+    // Update details in page data state
+    setData((prev: any) => ({
+      ...prev,
+      details: updatedDetails
+    }));
+
+    toast.success(decision === 'APPROVED' ? 'Đã duyệt minh chứng và cộng điểm!' : 'Đã từ chối minh chứng');
+    setReviewEvidence(null);
   };
 
   const openEvidencePopup = (files: EvidenceFile[]) => {
@@ -256,7 +323,9 @@ const TrainingScoreDetail = () => {
                     {section.criteria.map((criterion) => {
                       const studentScore = Number(data.details?.[criterion.id]?.score || 0);
                       const files = normalizeEvidenceList(data.details?.[criterion.id]?.files || []);
+                      const activities = normalizeTrainingActivities(data.details?.[criterion.id]?.activities || []);
                       const currentAdminScore = Number(adminScores[criterion.id] || 0);
+                      const customEvidenceList = data.details?.[criterion.id]?.customEvidence || [];
 
                       return (
                         <tr key={criterion.id} className="align-top hover:bg-slate-50/30 transition-colors">
@@ -268,6 +337,67 @@ const TrainingScoreDetail = () => {
                           <td className="px-6 py-5">
                             <p className="text-sm font-bold text-slate-800 leading-snug">{criterion.content}</p>
                             <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">{criterion.guide}</p>
+                            {activities.length > 0 && (
+                              <div className="mt-2 space-y-1 rounded-xl border border-emerald-100 bg-emerald-50/60 px-2 py-1.5">
+                                {activities.map((activity, activityIndex) => (
+                                  <p
+                                    key={`${activity.checkedInAt}-${activityIndex}`}
+                                    className="text-[10px] font-bold text-emerald-700"
+                                  >
+                                    +{activity.points}d - {activity.activityName}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+
+                            {customEvidenceList.length > 0 && (
+                              <div className="mt-2 space-y-2 rounded-2xl border border-slate-100 bg-slate-50/50 p-2.5">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Minh chứng tự nộp</p>
+                                <div className="space-y-1.5">
+                                  {customEvidenceList.map((item: any) => (
+                                    <div key={item.id} className="flex items-center justify-between p-1.5 rounded-xl bg-white border border-slate-100 gap-2">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1">
+                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                                            item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                            item.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                                            'bg-amber-50 text-amber-600 border border-amber-100'
+                                          }`}>
+                                            {item.status === 'APPROVED' ? 'Đã duyệt' : item.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+                                          </span>
+                                          <span className="text-[10px] font-black text-slate-700">+{item.points}đ</span>
+                                        </div>
+                                        <p className="text-xs font-bold text-slate-800 truncate" title={item.activityName}>{item.activityName}</p>
+                                      </div>
+
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        {item.files && item.files.length > 0 && (
+                                          <button
+                                            onClick={() => openEvidencePopup(item.files)}
+                                            className="p-1 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-slate-500 hover:text-blue-600 transition-all shadow-sm"
+                                            title="Xem ảnh minh chứng"
+                                          >
+                                            <Eye size={12} />
+                                          </button>
+                                        )}
+                                        {item.status === 'PENDING' && (
+                                          <button
+                                            onClick={() => {
+                                              setReviewEvidence({ criterionId: criterion.id, item });
+                                              setReviewPoints(item.points);
+                                              setReviewTargetCrit(criterion.id);
+                                            }}
+                                            className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                                          >
+                                            Xét duyệt
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-5">
                             {files.length > 0 ? (
@@ -313,13 +443,66 @@ const TrainingScoreDetail = () => {
                  {section.criteria.map((criterion) => {
                     const studentScore = Number(data.details?.[criterion.id]?.score || 0);
                     const files = normalizeEvidenceList(data.details?.[criterion.id]?.files || []);
+                    const activities = normalizeTrainingActivities(data.details?.[criterion.id]?.activities || []);
                     const currentAdminScore = Number(adminScores[criterion.id] || 0);
+                    const customEvidenceList = data.details?.[criterion.id]?.customEvidence || [];
 
                     return (
                        <div key={criterion.id} className="p-4 space-y-3">
                           <div className="flex items-start gap-2.5">
                              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black text-slate-500 shrink-0">{criterion.id.replace('crit-', '')}</span>
                              <h4 className="text-xs font-black text-slate-800 leading-tight">{criterion.content}</h4>
+                           </div>
+
+                           {customEvidenceList.length > 0 && (
+                             <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/50 p-2.5 my-2">
+                               <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Minh chứng tự nộp</p>
+                               <div className="space-y-1.5">
+                                 {customEvidenceList.map((item: any) => (
+                                   <div key={item.id} className="p-2.5 rounded-xl bg-white border border-slate-100 space-y-2">
+                                     <div className="flex flex-col gap-1">
+                                       <div className="flex items-center justify-between gap-2">
+                                         <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                                           item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                           item.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                                           'bg-amber-50 text-amber-600 border border-amber-100'
+                                         }`}>
+                                           {item.status === 'APPROVED' ? 'Đã duyệt' : item.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+                                         </span>
+                                         <span className="text-[10px] font-black text-slate-700">+{item.points}đ</span>
+                                       </div>
+                                       <p className="text-xs font-bold text-slate-800 leading-snug">{item.activityName}</p>
+                                     </div>
+
+                                     <div className="flex gap-2 pt-1 border-t border-slate-50">
+                                       {item.files && item.files.length > 0 && (
+                                         <button
+                                           onClick={() => openEvidencePopup(item.files)}
+                                           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-slate-500 hover:text-blue-600 text-[10px] font-bold transition-all shadow-sm"
+                                         >
+                                           <Eye size={12} /> Xem ảnh
+                                         </button>
+                                       )}
+                                       {item.status === 'PENDING' && (
+                                         <button
+                                           onClick={() => {
+                                             setReviewEvidence({ criterionId: criterion.id, item });
+                                             setReviewPoints(item.points);
+                                             setReviewTargetCrit(criterion.id);
+                                           }}
+                                           className="flex-1 flex items-center justify-center py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                                         >
+                                           Xét duyệt
+                                         </button>
+                                       )}
+                                     </div>
+                                   </div>
+                                 ))}
+                               </div>
+                             </div>
+                           )}
+
+                           <div style={{ display: 'none' }}>
                           </div>
 
                           <div className="flex items-center justify-between gap-3 bg-slate-50/50 p-2 rounded-xl border border-slate-100">
@@ -347,6 +530,19 @@ const TrainingScoreDetail = () => {
                                 </div>
                              </div>
                           </div>
+
+                          {activities.length > 0 && (
+                            <div className="space-y-1 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2">
+                              {activities.map((activity, activityIndex) => (
+                                <p
+                                  key={`${activity.checkedInAt}-${activityIndex}`}
+                                  className="text-[10px] font-bold text-emerald-700"
+                                >
+                                  +{activity.points}d - {activity.activityName}
+                                </p>
+                              ))}
+                            </div>
+                          )}
 
                           <div className="flex gap-2">
                              <button onClick={() => setAdminScores(p => ({...p, [criterion.id]: studentScore}))} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${currentAdminScore === studentScore ? 'bg-emerald-500 text-white shadow-lg' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -418,6 +614,106 @@ const TrainingScoreDetail = () => {
           </div>
         </div>
       </div>
+
+      {reviewEvidence && (() => {
+        const selectedCritMeta = EVALUATION_DATA.flatMap(s => s.criteria).find(c => c.id === reviewTargetCrit);
+        const maxAllowedPoints = selectedCritMeta ? selectedCritMeta.maxPoints : 10;
+        const mainImage = reviewEvidence.item.files?.[0]?.path;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-2xl rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Xét duyệt minh chứng tự nộp</p>
+                  <h3 className="text-lg font-black text-slate-900">Hoạt động: {reviewEvidence.item.activityName}</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReviewEvidence(null)}
+                  className="rounded-xl p-1.5 hover:bg-slate-50 text-slate-400 hover:text-slate-700 transition"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                {mainImage && (
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Ảnh minh chứng</label>
+                    <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
+                      <img
+                        src={mainImage.startsWith('http') ? mainImage : `http://localhost:5000${mainImage.startsWith('/') ? '' : '/'}${mainImage}`}
+                        alt="Minh chứng"
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Duyệt vào Mục/Tiêu chí nào? *</label>
+                    <select
+                      value={reviewTargetCrit}
+                      onChange={(e) => {
+                        const newCritId = e.target.value;
+                        setReviewTargetCrit(newCritId);
+                        const nextMeta = EVALUATION_DATA.flatMap(s => s.criteria).find(c => c.id === newCritId);
+                        if (nextMeta) {
+                          setReviewPoints(Math.min(nextMeta.maxPoints, reviewPoints));
+                        }
+                      }}
+                      className="w-full rounded-[1.2rem] border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white font-bold"
+                    >
+                      {EVALUATION_DATA.map((sec) => (
+                        <optgroup key={sec.id} label={sec.title}>
+                          {sec.criteria.map((crit) => (
+                            <option key={crit.id} value={crit.id}>
+                              Mục {crit.id.replace('crit-', '')} - {crit.content} (Tối đa: {crit.maxPoints}đ)
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Số điểm duyệt cộng *</label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      max={maxAllowedPoints}
+                      value={reviewPoints}
+                      onChange={(e) => setReviewPoints(Math.min(maxAllowedPoints, Math.max(0, Number(e.target.value || 0))))}
+                      className="w-full rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white font-black"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 italic font-bold">Điểm tối đa của mục này: {maxAllowedPoints}đ</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-slate-50">
+                  <button
+                    type="button"
+                    onClick={() => handleReviewDecision('REJECTED')}
+                    className="flex-1 py-3 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-2xl transition border border-rose-200 text-center"
+                  >
+                    Từ chối duyệt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleReviewDecision('APPROVED')}
+                    className="flex-1 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-2xl transition text-center flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                  >
+                    Đồng ý & Duyệt cộng điểm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <PreviewModal 
         files={evidencePopup?.files || []}
