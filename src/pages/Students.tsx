@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { Plus, Search, Edit2, Trash2, X, UserX, Loader2, ClipboardCheck, FileSpreadsheet, Download, Key, Mail } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, UserX, Loader2, ClipboardCheck, FileSpreadsheet, Download, Key, Mail, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { downloadXlsxFile } from '../utils/download';
@@ -80,6 +80,153 @@ const Students = () => {
     } catch (error) {
       toast.error('Không thể tải file mẫu');
     }
+  };
+
+  const escapeHtml = (value: unknown) =>
+    String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+  const handleExportAccountsPdf = () => {
+    if (!classFilter) {
+      toast.error('Vui lòng chọn lớp trước khi xuất PDF tài khoản');
+      return;
+    }
+
+    if (students.length === 0) {
+      toast.error('Lớp này chưa có sinh viên để xuất PDF');
+      return;
+    }
+
+    const orderedStudents = [...students].sort((a: any, b: any) => {
+      const orderA = Number(a.order_number || 0);
+      const orderB = Number(b.order_number || 0);
+      if (orderA && orderB && orderA !== orderB) return orderA - orderB;
+      if (orderA && !orderB) return -1;
+      if (!orderA && orderB) return 1;
+      return String(a.student_code || '').localeCompare(String(b.student_code || ''));
+    });
+
+    const rows = orderedStudents.map((student: any, index) => `
+      <tr>
+        <td>${escapeHtml(student.order_number || index + 1)}</td>
+        <td>${escapeHtml(student.student_code)}</td>
+        <td>${escapeHtml(student.name)}</td>
+        <td>${escapeHtml(student.email)}</td>
+        <td>${escapeHtml(student.student_code)}</td>
+        <td>1234</td>
+      </tr>
+    `).join('');
+
+    const printWindow = window.open('', '_blank', 'width=1024,height=768');
+    if (!printWindow) {
+      toast.error('Trình duyệt đã chặn cửa sổ xuất PDF');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="vi">
+        <head>
+          <meta charset="utf-8" />
+          <title>Tài khoản sinh viên ${escapeHtml(classFilter)}</title>
+          <style>
+            @page { size: A4; margin: 14mm; }
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              color: #0f172a;
+              font-family: Arial, "DejaVu Sans", sans-serif;
+              font-size: 12px;
+            }
+            header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              gap: 24px;
+              margin-bottom: 16px;
+              padding-bottom: 12px;
+              border-bottom: 2px solid #0f172a;
+            }
+            h1 {
+              margin: 0 0 6px;
+              font-size: 20px;
+              text-transform: uppercase;
+            }
+            .meta {
+              color: #475569;
+              line-height: 1.5;
+            }
+            .badge {
+              border: 1px solid #cbd5e1;
+              border-radius: 8px;
+              padding: 8px 10px;
+              text-align: right;
+              min-width: 150px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            th, td {
+              border: 1px solid #cbd5e1;
+              padding: 7px 8px;
+              vertical-align: top;
+            }
+            th {
+              background: #e2e8f0;
+              font-weight: 700;
+              text-align: left;
+            }
+            td:first-child,
+            th:first-child {
+              text-align: center;
+              width: 42px;
+            }
+            .note {
+              margin-top: 14px;
+              color: #475569;
+              font-size: 11px;
+            }
+          </style>
+        </head>
+        <body>
+          <header>
+            <div>
+              <h1>Danh sách tài khoản sinh viên</h1>
+              <div class="meta">Lớp: <strong>${escapeHtml(classFilter)}</strong></div>
+              <div class="meta">Tổng số sinh viên: <strong>${orderedStudents.length}</strong></div>
+            </div>
+            <div class="badge">
+              <strong>QLSV</strong><br />
+              Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}
+            </div>
+          </header>
+
+          <table>
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>MSSV</th>
+                <th>Họ tên</th>
+                <th>Email</th>
+                <th>Tên đăng nhập</th>
+                <th>Mật khẩu mặc định</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+
+          <p class="note">Ghi chú: mật khẩu hiển thị là mật khẩu mặc định khi cấp tài khoản. Nếu đã đặt lại mật khẩu riêng, hệ thống không thể xuất lại mật khẩu thật.</p>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.setTimeout(() => printWindow.print(), 300);
   };
 
   const handleDeleteAccount = async (student: any) => {
@@ -170,6 +317,13 @@ const Students = () => {
           >
             <Download size={20} />
             <span>Tải file mẫu</span>
+          </button>
+          <button
+            onClick={handleExportAccountsPdf}
+            className="flex items-center justify-center space-x-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+          >
+            <FileText size={20} />
+            <span>Xuất PDF tài khoản</span>
           </button>
           <label className="flex items-center justify-center space-x-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer">
             <FileSpreadsheet size={20} />
