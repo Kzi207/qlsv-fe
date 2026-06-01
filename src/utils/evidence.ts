@@ -1,3 +1,5 @@
+import { buildApiUrl } from '../api/axios';
+
 export interface EvidenceFile {
   path: string;
   name: string;
@@ -5,7 +7,6 @@ export interface EvidenceFile {
   url?: string;
 }
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
 const ABSOLUTE_URL_PATTERN = /^https?:\/\//i;
 
 const isAbsoluteUrl = (value: string) => ABSOLUTE_URL_PATTERN.test(value);
@@ -73,7 +74,7 @@ export const getEvidenceUrl = (file: EvidenceFile | string) => {
   if (isAbsoluteUrl(normalized.path)) return normalized.path;
 
   const key = isR2Path(normalized.path) ? normalized.path : toEvidenceKey(normalized.path);
-  return `${API_BASE}/api/training/evidence/${encodeURIComponent(key)}`;
+  return buildApiUrl(`/training/evidence/${encodeURIComponent(key)}`);
 };
 
 export const isPdfEvidence = (file: EvidenceFile | string) => {

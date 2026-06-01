@@ -15,6 +15,7 @@ import { toast } from 'react-hot-toast';
 import api from '../api/axios';
 import { EVALUATION_DATA } from '../constants/evaluationData';
 import {
+  getEvidenceUrl,
   type EvidenceFile,
   normalizeEvidenceList,
 } from '../utils/evidence';
@@ -336,7 +337,12 @@ const TrainingScoreDetail = () => {
                           </td>
                           <td className="px-6 py-5">
                             <p className="text-sm font-bold text-slate-800 leading-snug">{criterion.content}</p>
-                            <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">{criterion.guide}</p>
+                            {criterion.guide && (
+                              <div className="mt-2 text-[11px] leading-relaxed text-slate-600 bg-slate-50 border-l-2 border-slate-300 p-2 rounded-r-lg whitespace-pre-line font-medium">
+                                <span className="font-bold text-slate-700 block mb-0.5">💡 Hướng dẫn chấm:</span>
+                                {criterion.guide}
+                              </div>
+                            )}
                             {activities.length > 0 && (
                               <div className="mt-2 space-y-1 rounded-xl border border-emerald-100 bg-emerald-50/60 px-2 py-1.5">
                                 {activities.map((activity, activityIndex) => (
@@ -451,7 +457,14 @@ const TrainingScoreDetail = () => {
                        <div key={criterion.id} className="p-4 space-y-3">
                           <div className="flex items-start gap-2.5">
                              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black text-slate-500 shrink-0">{criterion.id.replace('crit-', '')}</span>
-                             <h4 className="text-xs font-black text-slate-800 leading-tight">{criterion.content}</h4>
+                             <div className="space-y-1.5 min-w-0 flex-1">
+                               <h4 className="text-xs font-black text-slate-800 leading-tight">{criterion.content}</h4>
+                               {criterion.guide && (
+                                 <p className="text-[10px] leading-relaxed text-slate-500 bg-slate-50 border-l border-slate-300 pl-1.5 py-0.5 whitespace-pre-line font-medium">
+                                   {criterion.guide}
+                                 </p>
+                               )}
+                             </div>
                            </div>
 
                            {customEvidenceList.length > 0 && (
@@ -618,7 +631,7 @@ const TrainingScoreDetail = () => {
       {reviewEvidence && (() => {
         const selectedCritMeta = EVALUATION_DATA.flatMap(s => s.criteria).find(c => c.id === reviewTargetCrit);
         const maxAllowedPoints = selectedCritMeta ? selectedCritMeta.maxPoints : 10;
-        const mainImage = reviewEvidence.item.files?.[0]?.path;
+        const mainEvidence = normalizeEvidenceList(reviewEvidence.item.files || [])[0];
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -638,12 +651,12 @@ const TrainingScoreDetail = () => {
               </div>
 
               <div className="mt-4 space-y-4">
-                {mainImage && (
+                {mainEvidence && (
                   <div>
                     <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Ảnh minh chứng</label>
                     <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
                       <img
-                        src={mainImage.startsWith('http') ? mainImage : `http://localhost:5000${mainImage.startsWith('/') ? '' : '/'}${mainImage}`}
+                        src={getEvidenceUrl(mainEvidence)}
                         alt="Minh chứng"
                         className="h-full w-full object-contain"
                       />
@@ -676,6 +689,12 @@ const TrainingScoreDetail = () => {
                         </optgroup>
                       ))}
                     </select>
+                    {selectedCritMeta?.guide && (
+                      <div className="mt-2 rounded-xl bg-sky-50 border border-sky-100 p-2.5 text-[11px] leading-relaxed text-sky-950 whitespace-pre-line font-medium">
+                        <span className="font-bold text-sky-800 block mb-0.5">💡 Hướng dẫn chấm:</span>
+                        {selectedCritMeta.guide}
+                      </div>
+                    )}
                   </div>
 
                   <div>

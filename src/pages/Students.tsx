@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Plus, Search, Edit2, Trash2, X, UserX, Loader2, ClipboardCheck, FileSpreadsheet, Download, Key, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { downloadXlsxFile } from '../utils/download';
 
 const Students = () => {
   const navigate = useNavigate();
@@ -75,13 +76,7 @@ const Students = () => {
       const response = await api.get('/students/template', {
         responseType: 'blob'
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'mau-nhap-sinh-vien.xlsx');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      downloadXlsxFile(response.data, 'mau-nhap-sinh-vien.xlsx');
     } catch (error) {
       toast.error('Không thể tải file mẫu');
     }

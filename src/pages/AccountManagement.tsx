@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { Search, Shield, Key, Loader2, UserCheck, UserX, FileDown } from 'lucide-react';
+import { downloadXlsxFile } from '../utils/download';
 
 const AccountManagement = () => {
   const [students, setStudents] = useState<any[]>([]);
@@ -79,14 +80,10 @@ const AccountManagement = () => {
         responseType: 'blob',
       });
 
-      const url = window.URL.createObjectURL(res.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `tai-khoan-sv-${selectedIds.length > 0 ? 'da-chon' : (classFilter || 'tat-ca')}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      downloadXlsxFile(
+        res.data,
+        `tai-khoan-sv-${selectedIds.length > 0 ? 'da-chon' : (classFilter || 'tat-ca')}.xlsx`,
+      );
     } catch (error: any) {
       console.error('Export error:', error);
       if (error.response?.data instanceof Blob) {

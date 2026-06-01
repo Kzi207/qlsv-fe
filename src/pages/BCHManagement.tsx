@@ -3,6 +3,7 @@ import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { Plus, Search, Edit2, Trash2, X, Loader2, UserCheck, Phone, Mail, FileDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { downloadXlsxFile } from '../utils/download';
 
 interface Assignment {
   classId: string;
@@ -115,14 +116,7 @@ const BCHManagement = () => {
         responseType: 'blob',
       });
 
-      const url = window.URL.createObjectURL(res.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `phan-cong-${selectedClassForExport}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      downloadXlsxFile(res.data, `phan-cong-${selectedClassForExport}.xlsx`);
     } catch (_error) {
       toast.error('Khong the xuat file phan cong');
     }

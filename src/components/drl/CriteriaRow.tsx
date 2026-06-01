@@ -45,9 +45,14 @@ const CriteriaRow: React.FC<CriteriaRowProps> = ({
           <div className="h-5 w-5 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
              <span className="text-[9px] font-black text-blue-600">{criterion.id.replace('crit-', '')}</span>
           </div>
-          <div className="space-y-0.5 flex-1">
+          <div className="space-y-1.5 flex-1 min-w-0">
              <h4 className="text-[13px] font-black text-slate-800 leading-tight tracking-tight">{criterion.content}</h4>
-             {canShowGuide && <p className="text-[10px] font-bold text-slate-400 italic line-clamp-1">{criterion.guide}</p>}
+             {canShowGuide && (
+               <div className="flex items-start gap-1.5 rounded-lg bg-slate-50 px-2 py-1.5 text-[10px] font-medium leading-relaxed text-slate-500">
+                 <HelpCircle size={11} className="mt-0.5 shrink-0 text-blue-400/70" />
+                 <p className="whitespace-pre-line break-words italic">{criterion.guide}</p>
+               </div>
+             )}
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { 
+import {
   LayoutDashboard, 
   Users, 
   UserPlus, 
@@ -12,10 +12,12 @@ import {
   Calendar,
   UserCheck,
   ChevronRight,
-  User
+  User,
+  LifeBuoy,
+  History,
+  X
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) => {
   const location = useLocation();
@@ -31,6 +33,7 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
       items: [
         { name: 'Trang chủ', path: '/', icon: LayoutDashboard, roles: ['STUDENT', 'ADMIN', 'BCH'] },
         { name: 'Cá nhân', path: '/profile', icon: User, roles: ['STUDENT', 'ADMIN', 'BCH'] },
+        { name: 'Lịch sử hoạt động', path: '/activity-history', icon: History, roles: ['STUDENT', 'ADMIN', 'BCH'] },
       ]
     },
     {
@@ -60,6 +63,7 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
         { name: 'Sự kiện', path: '/events', icon: Calendar, roles: ['ADMIN', 'BCH'] },
         { name: 'Học kỳ', path: '/semesters', icon: Calendar, roles: ['ADMIN', 'BCH'] },
         { name: 'Tài khoản', path: '/accounts', icon: UserPlus, roles: ['ADMIN'] },
+        { name: 'Hỗ trợ', path: '/support', icon: LifeBuoy, roles: ['ADMIN'] },
         { name: 'Ban Cán Sự', path: '/bch', icon: UserCheck, roles: ['ADMIN'] },
       ]
     }
@@ -72,34 +76,41 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
 
   return (
     <>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden" 
-            onClick={toggle} 
-          />
-        )}
-      </AnimatePresence>
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
+          onClick={toggle}
+        />
+      )}
       
       <aside className={`fixed top-0 left-0 z-50 h-screen w-80 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 bg-white border-r border-slate-100 shadow-2xl lg:shadow-none`}>
         <div className="flex flex-col h-full">
           {/* Logo Section */}
-          <div className="p-6 pb-3 shrink-0 border-b border-slate-50">
-             <div className="flex items-center gap-3.5 group cursor-pointer">
-                <div className="h-14 w-14 shrink-0 rounded-2xl flex items-center justify-center overflow-hidden transition-transform group-hover:scale-110 duration-500 shadow-md shadow-slate-200/50">
+          <div className="p-5 pb-3 shrink-0 border-b border-slate-50">
+             <div className="flex items-start gap-2">
+             <Link to="/" className="flex flex-1 min-w-0 items-center gap-2.5 group cursor-pointer hover:no-underline">
+                <div className="h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center overflow-hidden transition-transform group-hover:scale-110 duration-500 shadow-md shadow-slate-200/50">
                    <img src="/logo-qlsv.png" alt="Logo" className="w-full h-full object-contain" />
                 </div>
                 <div className="flex-1 min-w-0">
-                   <h1 className="text-[11px] font-extrabold uppercase tracking-tight text-slate-800 leading-tight">
+                   <h1 className="text-[0] font-extrabold uppercase tracking-tight text-slate-800 leading-tight">
+                     <span className="block whitespace-nowrap text-[10px]">ĐH Kỹ Thuật - Công Nghệ</span>
+                     <span className="block text-[10px]">Cần Thơ</span>
                      ĐH Kỹ Thuật - Công Nghệ Cần Thơ
                    </h1>
-                   <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider mt-1 bg-blue-50/70 inline-block px-2 py-0.5 rounded-md">
+                   <p className="text-[0] font-black text-blue-600 uppercase tracking-tight mt-1 bg-blue-50/70 inline-block whitespace-nowrap px-2 py-0.5 rounded-md leading-none">
+                     <span className="text-[9px]">Khoa Kỹ Thuật Cơ Khí</span>
                      Khoa Kỹ Thuật Cơ Khí
                    </p>
                 </div>
+             </Link>
+             <button
+               onClick={toggle}
+               className="lg:hidden -mt-1 -mr-1 h-8 w-8 shrink-0 flex items-center justify-center rounded-lg bg-slate-50 text-slate-500 border border-slate-100 shadow-sm active:scale-90 transition-all"
+               aria-label="Đóng menu"
+             >
+               <X size={16} />
+             </button>
              </div>
           </div>
 

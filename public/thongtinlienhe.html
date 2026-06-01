@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thông tin liên hệ</title>
+    <style>
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f8fafc; color: #0f172a; }
+      .wrap { max-width: 980px; margin: 28px auto; padding: 0 12px; }
+      .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-bottom: 18px; }
+      h1 { margin: 0 0 10px; font-size: 30px; }
+      h2 { margin: 0 0 10px; font-size: 20px; color: #1d4ed8; }
+      p { color: #334155; line-height: 1.7; }
+      .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .btn { display: inline-block; text-decoration: none; background: #2563eb; color: #fff; padding: 10px 14px; border-radius: 10px; font-weight: 700; border: none; cursor: pointer; }
+      .btn:disabled { opacity: 0.7; cursor: not-allowed; }
+      .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+      label { display: block; margin-bottom: 6px; font-weight: 700; color: #334155; }
+      input, textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+      textarea { min-height: 130px; resize: vertical; }
+      .msg { margin-top: 12px; font-weight: 700; }
+      .ok { color: #15803d; }
+      .err { color: #b91c1c; }
+      .links { margin-top: 16px; display: flex; gap: 14px; flex-wrap: wrap; }
+      .links a { color: #1d4ed8; text-decoration: none; font-weight: 700; }
+      .links a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <div class="top">
+          <h1>Thông tin liên hệ</h1>
+          <a class="btn" href="/login">Về trang đăng nhập</a>
+        </div>
+        <p>
+          Nếu bạn cần hỗ trợ về đăng nhập, điểm danh, rèn luyện hoặc tài khoản, vui lòng gửi biểu mẫu.
+          Yêu cầu sẽ hiển thị tại menu <strong>Hỗ trợ</strong> của tài khoản quản trị.
+        </p>
+
+        <div class="links">
+          <a href="/chinhsachbaomat.html">Chính sách bảo mật</a>
+          <a href="/dieukhoansudung.html">Điều khoản sử dụng</a>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Gửi biểu mẫu hỗ trợ</h2>
+        <form id="support-form">
+          <div class="grid">
+            <div>
+              <label for="fullName">Họ và tên *</label>
+              <input id="fullName" name="fullName" type="text" required />
+            </div>
+            <div>
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" />
+            </div>
+            <div>
+              <label for="phone">Số điện thoại</label>
+              <input id="phone" name="phone" type="text" />
+            </div>
+            <div>
+              <label for="subject">Tiêu đề *</label>
+              <input id="subject" name="subject" type="text" required />
+            </div>
+          </div>
+
+          <div style="margin-top: 14px;">
+            <label for="message">Nội dung *</label>
+            <textarea id="message" name="message" required></textarea>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <button id="submit-btn" class="btn" type="submit">Gửi hỗ trợ</button>
+          </div>
+
+          <div id="form-message" class="msg"></div>
+        </form>
+      </section>
+    </main>
+
+    <script>
+      const API_BASE =
+        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:5000/api'
+          : '/api';
+
+      const form = document.getElementById('support-form');
+      const submitBtn = document.getElementById('submit-btn');
+      const messageEl = document.getElementById('form-message');
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        messageEl.textContent = '';
+        messageEl.className = 'msg';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Đang gửi...';
+
+        const payload = {
+          fullName: form.fullName.value.trim(),
+          email: form.email.value.trim(),
+          phone: form.phone.value.trim(),
+          subject: form.subject.value.trim(),
+          message: form.message.value.trim(),
+          sourcePage: '/thongtinlienhe.html',
+        };
+
+        try {
+          const res = await fetch(`${API_BASE}/support/public`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(data.message || 'Không thể gửi yêu cầu hỗ trợ');
+          }
+
+          form.reset();
+          messageEl.textContent = 'Đã gửi biểu mẫu thành công. Quản trị viên sẽ phản hồi sớm.';
+          messageEl.className = 'msg ok';
+        } catch (error) {
+          messageEl.textContent = error.message || 'Có lỗi xảy ra khi gửi biểu mẫu.';
+          messageEl.className = 'msg err';
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Gửi hỗ trợ';
+        }
+      });
+    </script>
+  </body>
+</html>
+

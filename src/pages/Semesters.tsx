@@ -12,6 +12,19 @@ const toDateTimeInputValue = (value?: string | null) => {
   return new Date(parsed.getTime() - offsetMs).toISOString().slice(0, 16);
 };
 
+const isValidTime24h = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value.trim());
+
+const getDatePart = (value: string) => value.split('T')[0] || '';
+
+const getTimePart = (value: string) => value.split('T')[1]?.slice(0, 5) || '';
+
+const updateDateTimePart = (value: string, part: 'date' | 'time', nextValue: string) => {
+  const datePart = part === 'date' ? nextValue : getDatePart(value);
+  const timePart = part === 'time' ? nextValue : getTimePart(value);
+  if (!datePart && !timePart) return '';
+  return `${datePart || new Date().toISOString().slice(0, 10)}T${timePart || '00:00'}`;
+};
+
 const Semesters = () => {
   const [semesters, setSemesters] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -83,6 +96,12 @@ const Semesters = () => {
     if (isDuplicate) return toast.error('Học kỳ này đã tồn tại trong hệ thống');
 
     // 2. Validate date range
+    if (formData.startDate && !isValidTime24h(getTimePart(formData.startDate))) {
+      return toast.error('Gio bat dau phai dung dinh dang 24 gio HH:mm');
+    }
+    if (formData.endDate && !isValidTime24h(getTimePart(formData.endDate))) {
+      return toast.error('Gio ket thuc phai dung dinh dang 24 gio HH:mm');
+    }
     if (formData.startDate && formData.endDate) {
       const start = new Date(formData.startDate).getTime();
       const end = new Date(formData.endDate).getTime();
@@ -394,24 +413,46 @@ const Semesters = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 block">Ngày bắt đầu</label>
-                    <input
-                      type="datetime-local"
-                      value={formData.startDate}
-                      onChange={e => setFormData({...formData, startDate: e.target.value})}
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-900 transition-all"
-                    />
+                    <div className="grid grid-cols-[1fr_96px] gap-2">
+                      <input
+                        type="date"
+                        value={getDatePart(formData.startDate)}
+                        onChange={e => setFormData({...formData, startDate: updateDateTimePart(formData.startDate, 'date', e.target.value)})}
+                        className="w-full px-4 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-900 transition-all"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                        placeholder="08:00"
+                        value={getTimePart(formData.startDate)}
+                        onChange={e => setFormData({...formData, startDate: updateDateTimePart(formData.startDate, 'time', e.target.value)})}
+                        className="w-full px-3 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-900 transition-all"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 block">Ngày kết thúc</label>
-                    <input
-                      type="datetime-local"
-                      value={formData.endDate}
-                      onChange={e => setFormData({...formData, endDate: e.target.value})}
-                      className="w-full px-6 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-900 transition-all"
-                    />
+                    <div className="grid grid-cols-[1fr_96px] gap-2">
+                      <input
+                        type="date"
+                        value={getDatePart(formData.endDate)}
+                        onChange={e => setFormData({...formData, endDate: updateDateTimePart(formData.endDate, 'date', e.target.value)})}
+                        className="w-full px-4 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-900 transition-all"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                        placeholder="17:00"
+                        value={getTimePart(formData.endDate)}
+                        onChange={e => setFormData({...formData, endDate: updateDateTimePart(formData.endDate, 'time', e.target.value)})}
+                        className="w-full px-3 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-900 transition-all"
+                      />
+                    </div>
                   </div>
                 </div>
 

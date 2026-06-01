@@ -19,6 +19,7 @@ import {
 import { toast } from 'react-hot-toast';
 import api from '../api/axios';
 import { EVALUATION_DATA } from '../constants/evaluationData';
+import { downloadXlsxFile } from '../utils/download';
 
 interface ClassOption {
   name: string;
@@ -93,21 +94,16 @@ interface SessionSummaryResponse {
 }
 
 const GOOGLE_MAP_PATTERNS = [
-  /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
-  /!3d(-?\d+(?:\.\d+)?)[^!]*!4d(-?\d+(?:\.\d+)?)/,
-  /[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
-  /[?&]ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
-  /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+  /@([+-]?\d+(?:\.\d+)?),([+-]?\d+(?:\.\d+)?)/,
+  /!3d([+-]?\d+(?:\.\d+)?)[^!]*!4d([+-]?\d+(?:\.\d+)?)/,
+  /[?&]q=([+-]?\d+(?:\.\d+)?),([+-]?\d+(?:\.\d+)?)/,
+  /[?&]ll=([+-]?\d+(?:\.\d+)?),([+-]?\d+(?:\.\d+)?)/,
+  /([+-]?\d+(?:\.\d+)?),\s*([+-]?\d+(?:\.\d+)?)/,
 ];
 
 const parseCoordinatesFromText = (input: string) => {
   const text = input.trim();
   if (!text) return null;
-
-  if (text.includes('maps.app.goo.gl')) {
-    toast.error('Link maps.app.goo.gl khong chua toa do. Vui long mo link day du hoac nhap lat,lng.');
-    return null;
-  }
 
   for (const pattern of GOOGLE_MAP_PATTERNS) {
     const match = text.match(pattern);
@@ -122,6 +118,26 @@ const parseCoordinatesFromText = (input: string) => {
 
   return null;
 };
+
+const isValidTime24h = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value.trim());
+
+const buildLocalDateTime = (date: string, time: string) => {
+  const trimmedTime = time.trim();
+  if (!trimmedTime) return undefined;
+  return `${date}T${trimmedTime}:00`;
+};
+
+const formatDateTime24h = (value?: string | null) =>
+  value
+    ? new Date(value).toLocaleString('vi-VN', {
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '--';
 
 const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
   const sectionOptions = EVALUATION_DATA.map((section) => ({
@@ -139,9 +155,11 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
   const [creating, setCreating] = useState(false);
   const [markingManual, setMarkingManual] = useState<number | null>(null);
   const [mapInput, setMapInput] = useState('');
+  const [resolvingMap, setResolvingMap] = useState(false);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [classFilter, setClassFilter] = useState('');
   const [sessionTypeFilter, setSessionTypeFilter] = useState<'ALL' | 'QR_CLASS' | 'ACTIVITY'>(type || 'ALL');
+  const [showLargeQr, setShowLargeQr] = useState(false);
   const [newSession, setNewSession] = useState({
     sessionType: type || 'QR_CLASS',
     title: '',
@@ -221,7 +239,7 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
     try {
       const res = await api.get('/attendance/sessions', {
         params: {
-          classId: classFilter || undefined,
+          classId: sessionTypeFilter === 'ACTIVITY' ? undefined : classFilter || undefined,
           sessionType: sessionTypeFilter === 'ALL' ? undefined : sessionTypeFilter,
           limit: 30,
         },
@@ -250,6 +268,10 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
     }
   };
 
+  const refreshSelectedSession = async (sessionId: number) => {
+    await Promise.all([fetchSummary(sessionId), fetchSessions()]);
+  };
+
   useEffect(() => {
     fetchClasses();
     fetchSemesters();
@@ -258,8 +280,31 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
   }, []);
 
   useEffect(() => {
+    if (!type) return;
+    setNewSession((prev) => ({ ...prev, sessionType: type }));
+    setSessionTypeFilter(type);
+  }, [type]);
+
+  // Support Escape key to close the large QR Modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowLargeQr(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
     fetchSessions();
   }, [classFilter, sessionTypeFilter, type]);
+
+  useEffect(() => {
+    if (sessionTypeFilter === 'ACTIVITY' && classFilter) {
+      setClassFilter('');
+    }
+  }, [classFilter, sessionTypeFilter]);
 
   useEffect(() => {
     if (!criteriaOptions.length) return;
@@ -290,29 +335,34 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
     fetchSummary(selectedSessionId);
   }, [selectedSessionId]);
 
-  useEffect(() => {
-    if (!selectedSession?.id || !selectedSession.isActive) return;
-    const interval = setInterval(() => {
-      void fetchSummary(selectedSession.id, true);
-      void fetchSessions();
-    }, 8000);
-
-    return () => clearInterval(interval);
-  }, [selectedSession?.id, selectedSession?.isActive]);
-
   const updateCoordinates = (lat: number, lng: number) => {
     setNewSession((prev) => ({ ...prev, lat, lng }));
   };
 
-  const applyGoogleMapsInput = () => {
+  const applyGoogleMapsInput = async () => {
     const parsed = parseCoordinatesFromText(mapInput);
-    if (!parsed) {
-      toast.error('Khong doc duoc toa do tu du lieu da dan');
+    if (parsed) {
+      updateCoordinates(parsed.lat, parsed.lng);
+      toast.success('Da ap dung toa do tu Google Maps');
       return;
     }
 
-    updateCoordinates(parsed.lat, parsed.lng);
-    toast.success('Da ap dung toa do tu Google Maps');
+    setResolvingMap(true);
+    try {
+      const res = await api.post('/attendance/maps/resolve', { url: mapInput });
+      const lat = Number(res.data?.lat);
+      const lng = Number(res.data?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        toast.error('Khong doc duoc toa do tu du lieu da dan');
+        return;
+      }
+      updateCoordinates(lat, lng);
+      toast.success('Da lay toa do tu link Google Maps');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Khong doc duoc toa do tu link Google Maps');
+    } finally {
+      setResolvingMap(false);
+    }
   };
 
   const getCurrentLocation = () => {
@@ -363,7 +413,7 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
       toast.error('Vui long chon lop cho phien diem danh');
       return;
     }
-    if (type !== 'QR_CLASS') {
+    if (isActivitySession) {
       if (!newSession.criterionId) {
         toast.error('Vui long chon muc DRL can cong diem');
         return;
@@ -372,6 +422,15 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
         toast.error('Vui long nhap diem cong DRL lon hon 0');
         return;
       }
+    }
+
+    if (newSession.checkInStartAt && !isValidTime24h(newSession.checkInStartAt)) {
+      toast.error('Gio bat dau phai dung dinh dang 24 gio HH:mm');
+      return;
+    }
+    if (newSession.checkInEndAt && !isValidTime24h(newSession.checkInEndAt)) {
+      toast.error('Gio ket thuc phai dung dinh dang 24 gio HH:mm');
+      return;
     }
 
     if (!newSession.lat || !newSession.lng) {
@@ -385,7 +444,7 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
       ? (selectedClass?.active_semester_id || '')
       : newSession.drlSemesterId;
 
-    if (!hasClass && !semesterId && type !== 'QR_CLASS') {
+    if (!hasClass && !semesterId && isActivitySession) {
       toast.error('Vui lòng chọn học kỳ cho hoạt động.');
       return;
     }
@@ -396,20 +455,20 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
     }
 
     const payload = {
-      sessionType: newSession.sessionType,
-      title: type === 'QR_CLASS' ? `Diem danh ${newSession.subject || 'hoc phan'}` : newSession.title,
+      sessionType: type || newSession.sessionType,
+      title: isActivitySession ? newSession.title : `Diem danh ${newSession.subject || 'hoc phan'}`,
       subject: isActivitySession ? undefined : newSession.subject,
       class_id: hasClass ? newSession.class_id : undefined,
       sessionDate: newSession.sessionDate,
       radius: newSession.radius,
       lat: newSession.lat,
       lng: newSession.lng,
-      checkInStartAt: newSession.checkInStartAt || undefined,
-      checkInEndAt: newSession.checkInEndAt || undefined,
-      drlSectionId: type === 'QR_CLASS' ? undefined : newSession.sectionId,
-      drlCriterionId: type === 'QR_CLASS' ? undefined : newSession.criterionId,
-      drlPoints: type === 'QR_CLASS' ? 0 : newSession.drlPoints,
-      drlSemesterId: type === 'QR_CLASS' ? undefined : semesterId,
+      checkInStartAt: buildLocalDateTime(newSession.sessionDate, newSession.checkInStartAt),
+      checkInEndAt: buildLocalDateTime(newSession.sessionDate, newSession.checkInEndAt),
+      drlSectionId: isActivitySession ? newSession.sectionId : undefined,
+      drlCriterionId: isActivitySession ? newSession.criterionId : undefined,
+      drlPoints: isActivitySession ? newSession.drlPoints : undefined,
+      drlSemesterId: isActivitySession ? semesterId : undefined,
     };
 
     setCreating(true);
@@ -450,13 +509,7 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
       const res = await api.get(`/attendance/sessions/${sessionId}/export`, {
         responseType: 'blob'
       });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `diem-danh-${sessionTitle.toLowerCase().replace(/\s+/g, '-')}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      downloadXlsxFile(res.data, `diem-danh-${sessionTitle.toLowerCase().replace(/\s+/g, '-')}.xlsx`);
       toast.success('Tải danh sách điểm danh dạng Excel thành công!', { id: loadToast });
     } catch (err: any) {
       toast.error('Lỗi khi xuất file Excel', { id: loadToast });
@@ -592,7 +645,10 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Bắt đầu quét lúc</label>
                   <input
-                    type="datetime-local"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                    placeholder="08:00"
                     value={newSession.checkInStartAt}
                     onChange={(event) => setNewSession((prev) => ({ ...prev, checkInStartAt: event.target.value }))}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
@@ -601,7 +657,10 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Kết thúc quét lúc</label>
                   <input
-                    type="datetime-local"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                    placeholder="11:30"
                     value={newSession.checkInEndAt}
                     onChange={(event) => setNewSession((prev) => ({ ...prev, checkInEndAt: event.target.value }))}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
@@ -617,7 +676,7 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
                 <h4 className="font-bold text-slate-800 text-base">Cấu hình ĐRL</h4>
               </div>
 
-              {type !== 'QR_CLASS' ? (
+              {isActivitySession ? (
                 <>
                   {/* Học kỳ áp dụng */}
                   <div className="space-y-1.5">
@@ -773,7 +832,8 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
                   <button
                     type="button"
                     onClick={applyGoogleMapsInput}
-                    className="rounded-xl bg-indigo-50 px-3 text-xs font-bold text-indigo-700 hover:bg-indigo-100 whitespace-nowrap"
+                    disabled={resolvingMap}
+                    className="inline-flex items-center justify-center rounded-xl bg-indigo-50 px-3 text-xs font-bold text-indigo-700 hover:bg-indigo-100 whitespace-nowrap disabled:opacity-60"
                   >
                     Áp dụng
                   </button>
@@ -942,14 +1002,10 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
                     {(selectedSession.check_in_start_at || selectedSession.check_in_end_at) && (
                       <p className="flex items-center gap-2">
                         <Clock3 size={14} className="text-primary-500" />
-                        {selectedSession.check_in_start_at
-                          ? new Date(selectedSession.check_in_start_at).toLocaleString('vi-VN')
-                          : '--'}{' '}
+                        {formatDateTime24h(selectedSession.check_in_start_at)}{' '}
                         {' -> '}
                         {' '}
-                        {selectedSession.check_in_end_at
-                          ? new Date(selectedSession.check_in_end_at).toLocaleString('vi-VN')
-                          : '--'}
+                        {formatDateTime24h(selectedSession.check_in_end_at)}
                       </p>
                     )}
                     <p className="flex items-center gap-2">
@@ -969,16 +1025,25 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
                   </div>
 
                   {selectedSession.isActive && (
-                    <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-inner">
+                    <div 
+                      onClick={() => setShowLargeQr(true)}
+                      className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-inner cursor-pointer hover:border-indigo-400 group transition-all duration-300 relative overflow-hidden"
+                      title="Bấm để phóng to mã QR"
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center bg-indigo-900/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl">
+                        <span className="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 active:scale-95 transition-transform">
+                          🔍 Phóng to QR
+                        </span>
+                      </div>
                       <QRCodeSVG value={selectedSessionQrUrl || selectedSession.qrToken} size={190} level="H" includeMargin />
-                      <p className="mt-3 break-all text-[11px] font-mono text-slate-500">{selectedSessionQrUrl || selectedSession.qrToken}</p>
+                      <p className="mt-3 break-all text-[11px] font-mono text-slate-500 group-hover:text-indigo-600 transition-colors">{selectedSessionQrUrl || selectedSession.qrToken}</p>
                     </div>
                   )}
 
                   <div className="mt-5 flex flex-wrap gap-2.5">
                     <button
                       type="button"
-                      onClick={() => fetchSummary(selectedSession.id)}
+                      onClick={() => refreshSelectedSession(selectedSession.id)}
                       className="inline-flex flex-1 min-w-[100px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
                     >
                       <RefreshCw size={14} />
@@ -1122,9 +1187,7 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
                                 )}
                               </td>
                               <td className="px-4 py-4 text-slate-500">
-                                {student.attendance
-                                  ? new Date(student.attendance.checkedInAt).toLocaleString('vi-VN')
-                                  : '--'}
+                                {student.attendance ? formatDateTime24h(student.attendance.checkedInAt) : '--'}
                               </td>
                               <td className="px-4 py-4">
                                 {student.attendance ? (
@@ -1160,6 +1223,64 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
           </div>
         )}
       </div>
+
+      {/* Modal QR Code Phóng To Premium */}
+      {showLargeQr && selectedSession && (
+        <div 
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-md p-4"
+          onClick={() => setShowLargeQr(false)}
+        >
+          <div 
+            className="relative max-w-xl w-full rounded-[2.5rem] bg-white p-6 md:p-8 border border-slate-100 shadow-2xl text-center flex flex-col items-center justify-center transform scale-100 transition-all duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Nút đóng góc phải */}
+            <button 
+              type="button"
+              onClick={() => setShowLargeQr(false)}
+              className="absolute right-6 top-6 text-slate-400 hover:text-red-500 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            >
+              <XCircle className="h-8 w-8" />
+            </button>
+
+            {/* Chi tiết hoạt động */}
+            <div className="mb-6 space-y-2">
+              <span className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wider text-indigo-700">
+                {selectedSession.class_id || 'Toàn trường'}
+              </span>
+              <h3 className="text-2xl md:text-3xl font-black text-slate-800">{selectedSession.title}</h3>
+              <p className="text-sm font-semibold text-slate-500">{selectedSession.subject || 'Không có môn học'}</p>
+              <p className="text-xs text-slate-400">Quét mã QR dưới đây bằng camera hoặc trình duyệt để tiến hành điểm danh.</p>
+            </div>
+
+            {/* Mã QR cực to */}
+            <div className="rounded-[2rem] border-2 border-indigo-100 bg-white p-4 shadow-xl shadow-indigo-100/50">
+              <QRCodeSVG value={selectedSessionQrUrl || selectedSession.qrToken} size={320} level="H" includeMargin />
+            </div>
+
+            {/* Đường dẫn */}
+            <div className="mt-6 w-full">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">ĐƯỜNG DẪN ĐIỂM DANH:</p>
+              <p 
+                className="break-all rounded-2xl bg-slate-50 p-3.5 font-mono text-xs text-indigo-600 border border-slate-100 select-all cursor-pointer hover:bg-slate-100 transition-colors"
+                title="Bôi đen hoặc nhấp đúp để chọn tất cả"
+              >
+                {selectedSessionQrUrl || selectedSession.qrToken}
+              </p>
+            </div>
+
+            {/* Nút đóng chân trang */}
+            <button
+              type="button"
+              onClick={() => setShowLargeQr(false)}
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 hover:shadow-indigo-600/30 transition-all active:scale-95 cursor-pointer"
+            >
+              ĐÓNG CỬA SỔ [ESC]
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import type { ClassItem, EventRegistration, ManagedEvent } from '../types';
+import { downloadXlsxFile } from '../utils/download';
 import { 
   Calendar, 
   Plus, 
@@ -131,13 +132,7 @@ export default function EventManagement() {
       const res = await api.get(`/events/${eventId}/registrations/export`, {
         responseType: 'blob'
       });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `danh-sach-dang-ky-${eventTitle.toLowerCase().replace(/\s+/g, '-')}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      downloadXlsxFile(res.data, `danh-sach-dang-ky-${eventTitle.toLowerCase().replace(/\s+/g, '-')}.xlsx`);
       toast.success('Tải danh sách đăng ký dạng Excel thành công!', { id: loadToast });
     } catch (err: any) {
       toast.error('Lỗi khi xuất file Excel', { id: loadToast });

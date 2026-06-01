@@ -32,8 +32,16 @@ const extractQrToken = (rawValue: string): string => {
     const segments = parsed.pathname.split('/').filter(Boolean);
     const lastSegment = segments[segments.length - 1] || '';
     if (hex64Pattern.test(lastSegment)) return lastSegment;
+    
+    // If it is a parsed URL, but we couldn't extract any valid 64-hex token, return empty
+    return '';
   } catch {
     // not a URL
+  }
+
+  // Double check if value is URL-like but failed URL parsing
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return '';
   }
 
   return value;
@@ -55,11 +63,22 @@ const QRScannerCheckIn = () => {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [prefilledQrToken, setPrefilledQrToken] = useState('');
+  const [prefilledQrToken, setPrefilledQrToken] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('qrToken') || params.get('token') || '';
+    return extractQrToken(fromQuery || window.location.href);
+  });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [statusText, setStatusText] = useState('Sẵn sàng quét mã QR');
+  const [statusText, setStatusText] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('qrToken') || params.get('token') || '';
+    const extracted = extractQrToken(fromQuery || window.location.href);
+    return extracted
+      ? 'Đã nhận mã QR, đang đợi tọa độ GPS để tự động điểm danh...'
+      : 'Sẵn sàng quét mã QR';
+  });
   const [checkInError, setCheckInError] = useState(false);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -97,17 +116,6 @@ const QRScannerCheckIn = () => {
       }
     }
   }, [user, authInitialized, navigate]);
-
-  // Extract token from URL parameters
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const fromQuery = params.get('qrToken') || params.get('token') || '';
-    const extracted = extractQrToken(fromQuery || window.location.href);
-    if (extracted) {
-      setPrefilledQrToken(extracted);
-      setStatusText('Đã nhận mã QR, đang đợi tọa độ GPS để tự động điểm danh...');
-    }
-  }, []);
 
   const requestLocation = useCallback(() => {
     if (isRequestingLocationRef.current) return;

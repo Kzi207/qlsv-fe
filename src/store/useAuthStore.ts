@@ -38,7 +38,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       const res = await api.get('/auth/me');
       set({ user: res.data.user, isAuthenticated: true, authInitialized: true });
     } catch (_error) {
-      set({ user: null, isAuthenticated: false, authInitialized: true });
+      set((state) => {
+        // A slow /auth/me request from the login page must not undo a login
+        // that completed while the request was still in flight.
+        if (state.isAuthenticated) {
+          return { authInitialized: true };
+        }
+
+        return { user: null, isAuthenticated: false, authInitialized: true };
+      });
     }
   },
   login: (user) => {

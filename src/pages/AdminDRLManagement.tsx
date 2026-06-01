@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
+import { downloadXlsxFile } from '../utils/download';
 
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -101,12 +102,7 @@ const AdminDRLManagement = () => {
         },
         responseType: 'blob',
       });
-      const url = window.URL.createObjectURL(res.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'diem-ren-luyen.xlsx';
-      link.click();
-      window.URL.revokeObjectURL(url);
+      downloadXlsxFile(res.data, 'diem-ren-luyen.xlsx');
       toast.success('Da xuat file Excel');
     } catch (error) {
       toast.error('Xuat file that bai');
