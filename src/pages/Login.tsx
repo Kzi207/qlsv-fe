@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import api, { apiConfigError } from '../api/axios';
+import api, { apiConfigError, setFallbackAuthToken } from '../api/axios';
 import toast from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
 
@@ -66,6 +66,7 @@ const Login = () => {
 
     try {
       const res = await api.post('/auth/login', { username, password });
+      setFallbackAuthToken(res.data.accessToken || '', rememberMe);
       login(res.data.user);
       toast.success('Chào mừng trở lại!');
       

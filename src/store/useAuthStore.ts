@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api from '../api/axios';
+import api, { clearFallbackAuthToken } from '../api/axios';
 import { normalizeUserRole, type UserRole } from '../utils/auth';
 
 interface User {
@@ -65,6 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     // 1. Mark as logged out locally immediately
     localStorage.setItem('qlsv_just_logged_out', 'true');
+    clearFallbackAuthToken();
     
     // 2. Clear all potentially sensitive local data
     sessionStorage.clear();
