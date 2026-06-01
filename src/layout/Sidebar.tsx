@@ -18,12 +18,13 @@ import {
   X
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import { normalizeUserRole } from '../utils/auth';
 
 const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) => {
   const location = useLocation();
   const { logout, user } = useAuthStore();
 
-  const role = user?.role?.toUpperCase();
+  const role = normalizeUserRole(user?.role);
   const isAdmin = role === 'ADMIN';
   const isBch = role === 'BCH';
 
@@ -161,7 +162,7 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
                    <div className="flex-1 min-w-0">
                       <p className="font-black text-slate-900 text-xs truncate">{user?.name}</p>
                       <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mt-0.5">
-                         {isAdmin ? 'Administrator' : isBch ? 'Ban Cán Sự' : 'Sinh viên'}
+                         {isAdmin ? 'Administrator' : isBch ? 'Ban Cán Sự' : role === 'STUDENT' ? 'Sinh viên' : 'Người dùng'}
                       </p>
                    </div>
                 </div>

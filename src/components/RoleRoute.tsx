@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
+import { normalizeUserRole } from '../utils/auth';
 
 interface RoleRouteProps {
   children: React.ReactNode;
@@ -14,7 +15,7 @@ const RoleRoute = ({ children, allowedRoles }: RoleRouteProps) => {
     return <Navigate to="/login" />;
   }
 
-  const role = user?.role?.toUpperCase();
+  const role = normalizeUserRole(user?.role);
 
   if (user && !allowedRoles.includes(role as any)) {
     // If student tries to access admin page, redirect to home/dashboard

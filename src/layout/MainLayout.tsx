@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Menu, Home, CalendarCheck, Award, User, LogOut, MessageCircle, Sparkles } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import { normalizeUserRole } from '../utils/auth';
 const StudentChatbot = lazy(() => import('../components/StudentChatbot'));
 
 const ChatbotEntry = () => {
@@ -93,7 +94,7 @@ const BottomNav = () => {
 const MainLayout = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuthStore();
-  const isStudent = user?.role?.toUpperCase() === 'STUDENT';
+  const isStudent = normalizeUserRole(user?.role) === 'STUDENT';
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">

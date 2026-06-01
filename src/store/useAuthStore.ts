@@ -1,15 +1,21 @@
 import { create } from 'zustand';
 import api from '../api/axios';
+import { normalizeUserRole, type UserRole } from '../utils/auth';
 
 interface User {
   id: number;
   username: string;
   name: string;
   email?: string | null;
-  role: 'ADMIN' | 'BCH' | 'STUDENT';
+  role: UserRole;
   studentId?: number | null;
   class_id?: string | null;
 }
+
+const normalizeUser = (user: User): User => ({
+  ...user,
+  role: normalizeUserRole(user?.role) || 'STUDENT',
+});
 
 interface AuthState {
   user: User | null;
@@ -36,7 +42,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     try {
       const res = await api.get('/auth/me');
-      set({ user: res.data.user, isAuthenticated: true, authInitialized: true });
+      set({ user: normalizeUser(res.data.user), isAuthenticated: true, authInitialized: true });
     } catch (_error) {
       set((state) => {
         // A slow /auth/me request from the login page must not undo a login
@@ -51,10 +57,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   login: (user) => {
     localStorage.removeItem('qlsv_just_logged_out');
-    set({ user, isAuthenticated: true, authInitialized: true });
+    set({ user: normalizeUser(user), isAuthenticated: true, authInitialized: true });
   },
   setUser: (user) => {
-    set({ user, isAuthenticated: true, authInitialized: true });
+    set({ user: normalizeUser(user), isAuthenticated: true, authInitialized: true });
   },
   logout: async () => {
     // 1. Mark as logged out locally immediately

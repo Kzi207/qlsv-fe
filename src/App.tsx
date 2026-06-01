@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './store/useAuthStore';
 import MainLayout from './layout/MainLayout';
 import RoleRoute from './components/RoleRoute';
+import { normalizeUserRole } from './utils/auth';
 
 const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -48,7 +49,7 @@ const PrivateRoute = ({ children }: { children: ReactNode }) => {
 
 function App() {
   const { user, isAuthenticated, authInitialized, initializeAuth } = useAuthStore();
-  const isStudent = user?.role?.toUpperCase() === 'STUDENT';
+  const isStudent = normalizeUserRole(user?.role) === 'STUDENT';
 
   useEffect(() => {
     initializeAuth();
