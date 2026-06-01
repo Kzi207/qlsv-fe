@@ -70,6 +70,36 @@ const formatDetails = (details: unknown) => {
   }
 };
 
+const detectBrowserName = (userAgent: string) => {
+  if (/Edg\//.test(userAgent)) return 'Microsoft Edge';
+  if (/OPR\//.test(userAgent)) return 'Opera';
+  if (/SamsungBrowser\//.test(userAgent)) return 'Samsung Internet';
+  if (/Firefox\//.test(userAgent)) return 'Firefox';
+  if (/Chrome\//.test(userAgent) || /CriOS\//.test(userAgent)) return 'Chrome';
+  if (/Safari\//.test(userAgent)) return 'Safari';
+  return '';
+};
+
+const detectDeviceType = (userAgent: string) => {
+  if (/iPad/i.test(userAgent)) return 'iPad';
+  if (/iPhone/i.test(userAgent)) return 'iPhone';
+  if (/Android/i.test(userAgent)) return /Mobile/i.test(userAgent) ? 'Android Phone' : 'Android Tablet';
+  if (/Windows NT/i.test(userAgent)) return 'Windows';
+  if (/Macintosh|Mac OS X/i.test(userAgent)) return 'macOS';
+  if (/CrOS/i.test(userAgent)) return 'ChromeOS';
+  if (/Linux/i.test(userAgent)) return 'Linux';
+  return '';
+};
+
+const getDeviceName = (userAgent?: string | null) => {
+  const ua = String(userAgent || '').trim();
+  if (!ua) return '--';
+
+  const deviceType = detectDeviceType(ua);
+  const browserName = detectBrowserName(ua);
+  return [deviceType, browserName].filter(Boolean).join(' - ') || 'Thiết bị không xác định';
+};
+
 const ActivityHistory = () => {
   const { user } = useAuthStore();
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
@@ -157,7 +187,7 @@ const ActivityHistory = () => {
             onKeyDown={(event) => {
               if (event.key === 'Enter') fetchLogs();
             }}
-            placeholder="Tìm theo nội dung, tài khoản, IP, mã máy..."
+            placeholder="Tìm theo nội dung, tài khoản, IP, thiết bị..."
             className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
           />
         </label>
@@ -211,6 +241,7 @@ const ActivityHistory = () => {
           <div className="divide-y divide-slate-100">
             {logs.map((item) => {
               const detailsText = formatDetails(item.details);
+              const deviceName = getDeviceName(item.userAgent);
               return (
                 <div key={item.id} className="grid gap-4 p-5 lg:grid-cols-[220px_1fr_300px]">
                   <div className="space-y-2">
@@ -254,9 +285,9 @@ const ActivityHistory = () => {
                     <p>IP: {item.ipAddress || '--'}</p>
                     <p className="flex items-start gap-2">
                       <Laptop size={14} className="mt-0.5 shrink-0" />
-                      <span className="break-all">Mã máy: {item.deviceId || '--'}</span>
+                      <span className="break-words">Tên thiết bị: {deviceName}</span>
                     </p>
-                    {item.userAgent && <p className="break-words text-slate-500">Thiết bị: {item.userAgent}</p>}
+                    {item.userAgent && <p className="break-words text-slate-500">Trình duyệt: {item.userAgent}</p>}
                   </div>
                 </div>
               );
