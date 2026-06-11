@@ -207,7 +207,7 @@ const QRAttendanceManager = ({ type }: { type?: 'QR_CLASS' | 'ACTIVITY' }) => {
 
   const fetchClasses = async () => {
     try {
-      const res = await api.get('/classes');
+      const res = await api.get('/classes', { params: { include_counts: true } });
       setClasses(res.data);
       setNewSession((prev) => ({
         ...prev,

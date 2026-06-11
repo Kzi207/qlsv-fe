@@ -24,12 +24,12 @@ const Classes = lazy(() => import('./pages/Classes'));
 const Semesters = lazy(() => import('./pages/Semesters'));
 const TrainingScoreApproval = lazy(() => import('./pages/TrainingScoreApproval'));
 const TrainingScoreDetail = lazy(() => import('./pages/TrainingScoreDetail'));
+const TrainingStatistics = lazy(() => import('./pages/TrainingStatistics'));
 const BCHManagement = lazy(() => import('./pages/BCHManagement'));
 const Profile = lazy(() => import('./pages/Profile'));
 const PublicEventRegister = lazy(() => import('./pages/PublicEventRegister'));
 const EventManagement = lazy(() => import('./pages/EventManagement'));
 const SupportManagement = lazy(() => import('./pages/SupportManagement'));
-const ActivityHistory = lazy(() => import('./pages/ActivityHistory'));
 
 const PageFallback = () => (
   <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -92,6 +92,7 @@ function App() {
             <Route path="attendance/manage/class" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><QRAttendanceManager type="QR_CLASS" /></RoleRoute>} />
             <Route path="attendance/manage/activity" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><QRAttendanceManager type="ACTIVITY" /></RoleRoute>} />
             <Route path="training/approval" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><TrainingScoreApproval /></RoleRoute>} />
+            <Route path="training/statistics" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><TrainingStatistics /></RoleRoute>} />
             <Route path="evidence/review" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><AdminEvidenceReview /></RoleRoute>} />
 
             {/* ADMIN ONLY ROUTES */}
@@ -104,7 +105,7 @@ function App() {
 
             {/* SHARED ROUTES */}
             <Route path="profile" element={<Profile />} />
-            <Route path="activity-history" element={<RoleRoute allowedRoles={['ADMIN', 'BCH', 'STUDENT']}><ActivityHistory /></RoleRoute>} />
+            <Route path="activity-history" element={<Navigate to="/" replace />} />
             <Route path="attendance" element={<Attendance />} />
             <Route path="attendance/scan" element={<QRScannerCheckIn />} />
             <Route path="training" element={<TrainingScore />} />

@@ -28,6 +28,67 @@ const normalizeApiBaseUrl = (value: unknown) => {
 export const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
 let csrfTokenCache = '';
 let authTokenCache = '';
+const responseCache = new Map<string, { expiresAt: number; response: any }>();
+const inflightGetRequests = new Map<string, Promise<any>>();
+const DEFAULT_CACHE_TTL_MS = 0;
+
+const buildCacheKey = (url: string, config?: any) =>
+  JSON.stringify({
+    url: String(url || ''),
+    params: config?.params || null,
+    responseType: config?.responseType || 'json',
+  });
+
+const getCacheTtlMs = (url: string, config?: any) => {
+  const normalizedUrl = String(url || '').trim().toLowerCase();
+  if (!normalizedUrl || (config?.responseType && config.responseType !== 'json')) {
+    return 0;
+  }
+
+  if (normalizedUrl === '/classes' || normalizedUrl.startsWith('/classes?')) {
+    return 5 * 60 * 1000;
+  }
+
+  if (normalizedUrl === '/semesters' || normalizedUrl.startsWith('/semesters?')) {
+    return 5 * 60 * 1000;
+  }
+
+  if (normalizedUrl === '/support' || normalizedUrl.startsWith('/support?')) {
+    return 30 * 1000;
+  }
+
+  return DEFAULT_CACHE_TTL_MS;
+};
+
+const pruneExpiredResponseCache = () => {
+  const now = Date.now();
+  for (const [key, entry] of responseCache.entries()) {
+    if (entry.expiresAt <= now) {
+      responseCache.delete(key);
+    }
+  }
+};
+
+export const invalidateApiCache = (matcher?: string | RegExp | ((key: string) => boolean)) => {
+  if (!matcher) {
+    responseCache.clear();
+    inflightGetRequests.clear();
+    return;
+  }
+
+  for (const key of responseCache.keys()) {
+    const matched =
+      typeof matcher === 'string'
+        ? key.includes(matcher)
+        : matcher instanceof RegExp
+          ? matcher.test(key)
+          : matcher(key);
+    if (matched) {
+      responseCache.delete(key);
+      inflightGetRequests.delete(key);
+    }
+  }
+};
 
 const getApiConfigError = () => {
   // Relative paths (e.g. /api) are valid — they use Vite proxy and stay same-origin
@@ -196,6 +257,42 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const originalGet = api.get.bind(api);
+
+(api as any).get = (url: string, config?: any) => {
+  const ttlMs = getCacheTtlMs(url, config);
+  if (!ttlMs) {
+    return originalGet(url, config);
+  }
+
+  pruneExpiredResponseCache();
+  const cacheKey = buildCacheKey(url, config);
+  const cached = responseCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return Promise.resolve(cached.response);
+  }
+
+  const inflight = inflightGetRequests.get(cacheKey);
+  if (inflight) {
+    return inflight;
+  }
+
+  const request = originalGet(url, config)
+    .then((response) => {
+      responseCache.set(cacheKey, {
+        expiresAt: Date.now() + ttlMs,
+        response,
+      });
+      return response;
+    })
+    .finally(() => {
+      inflightGetRequests.delete(cacheKey);
+    });
+
+  inflightGetRequests.set(cacheKey, request);
+  return request;
+};
+
 const isAuthProbeRequest = (url?: string) => {
   const requestUrl = String(url || '');
   return requestUrl === '/auth/me' || requestUrl.endsWith('/auth/me');
@@ -235,6 +332,12 @@ api.interceptors.response.use(
     if (typeof responseToken === 'string' && responseToken) {
       writeStoredCsrfToken(responseToken);
     }
+
+    const method = String(response?.config?.method || 'get').toUpperCase();
+    if (method !== 'GET') {
+      invalidateApiCache();
+    }
+
     return response;
   },
   async (error) => {
@@ -263,6 +366,7 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
+      invalidateApiCache();
       writeStoredCsrfToken('');
       clearFallbackAuthToken();
       const isPublicPath = window.location.pathname === '/login' || window.location.pathname.startsWith('/dangky');

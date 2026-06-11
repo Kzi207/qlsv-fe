@@ -7,6 +7,7 @@ interface User {
   username: string;
   name: string;
   email?: string | null;
+  phone?: string | null;
   role: UserRole;
   studentId?: number | null;
   class_id?: string | null;

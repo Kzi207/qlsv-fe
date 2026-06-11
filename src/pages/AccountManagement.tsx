@@ -21,7 +21,10 @@ const AccountManagement = () => {
     setLoading(true);
     try {
       const res = await api.get('/students', {
-        params: { class_id: classFilter || undefined }
+        params: {
+          class_id: classFilter || undefined,
+          include_user: true,
+        }
       });
       setStudents(res.data);
     } catch (error) {

@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import api, { apiConfigError, setFallbackAuthToken } from '../api/axios';
 import toast from 'react-hot-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 
 const LOGIN_BACKGROUND_IMAGE_URL = String(import.meta.env.VITE_LOGIN_BACKGROUND_IMAGE_URL || '').trim();
-const LOGIN_LOGO_URL = String(import.meta.env.VITE_LOGIN_LOGO_URL || '').trim();
+const LOGIN_LOGO_URL = String(import.meta.env.VITE_LOGIN_LOGO_URL || '/logo-qlsv.png').trim();
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -14,6 +14,14 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotUsername, setForgotUsername] = useState('');
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotResetToken, setForgotResetToken] = useState('');
+  const [forgotStep, setForgotStep] = useState<'request' | 'confirm'>('request');
+  const [forgotLoading, setForgotLoading] = useState(false);
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
   const mobileBackgroundStyle = LOGIN_BACKGROUND_IMAGE_URL
@@ -74,11 +82,198 @@ const Login = () => {
       const redirectPath = params.get('redirect') || '/';
       navigate(redirectPath, { replace: true });
     } catch (error: any) {
-      toast.error(error.response?.data?.message || error.message || 'Đăng nhập thất bại');
+      const rawMessage = String(error.response?.data?.message || error.message || '').trim();
+      const loginErrorMessage =
+        rawMessage === 'Invalid credentials'
+          ? 'Tài khoản hoặc mật khẩu bạn nhập chưa đúng'
+          : rawMessage || 'Đăng nhập thất bại';
+      toast.error(loginErrorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  const resetForgotPasswordState = () => {
+    setForgotOpen(false);
+    setForgotUsername('');
+    setForgotCode('');
+    setForgotNewPassword('');
+    setForgotConfirmPassword('');
+    setForgotResetToken('');
+    setForgotStep('request');
+    setForgotLoading(false);
+  };
+
+  const handleRequestResetCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotUsername.trim()) {
+      toast.error('Vui lòng nhập mã sinh viên hoặc tên đăng nhập.');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const res = await api.post('/auth/forgot-password/request', {
+        username: forgotUsername.trim(),
+      });
+      setForgotResetToken(String(res.data?.resetToken || ''));
+      setForgotStep('confirm');
+      toast.success(res.data?.message || 'Đã gửi mã xác thực qua email sinh viên.');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Không thể gửi mã xác thực.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleConfirmResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotCode.trim()) {
+      toast.error('Vui lòng nhập mã xác thực.');
+      return;
+    }
+    if (forgotNewPassword.length < 8) {
+      toast.error('Mật khẩu mới phải có ít nhất 8 ký tự.');
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      toast.error('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const res = await api.post('/auth/forgot-password/confirm', {
+        resetToken: forgotResetToken,
+        code: forgotCode.trim(),
+        newPassword: forgotNewPassword,
+      });
+      toast.success(res.data?.message || 'Đổi mật khẩu thành công.');
+      resetForgotPasswordState();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Không thể đổi mật khẩu.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const forgotPasswordModal = forgotOpen ? (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Đóng"
+        className="absolute inset-0 bg-slate-900/55 backdrop-blur-sm"
+        onClick={resetForgotPasswordState}
+      />
+      <div className="relative z-10 w-full max-w-md rounded-[2rem] bg-white p-6 md:p-8 shadow-2xl border border-slate-100">
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600">Quên mật khẩu</p>
+            <h3 className="text-2xl font-black text-slate-900 mt-1">
+              {forgotStep === 'request' ? 'Nhận mã xác thực' : 'Đặt mật khẩu mới'}
+            </h3>
+            <p className="text-sm text-slate-500 mt-2">
+              {forgotStep === 'request'
+                ? 'Nhập mã sinh viên hoặc tên đăng nhập. Hệ thống sẽ gửi mã về email sinh viên.'
+                : 'Nhập mã đã nhận trong email và đặt lại mật khẩu mới.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={resetForgotPasswordState}
+            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {forgotStep === 'request' ? (
+          <form className="space-y-4" onSubmit={handleRequestResetCode}>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Mã sinh viên / Tên đăng nhập</label>
+              <input
+                type="text"
+                value={forgotUsername}
+                onChange={(e) => setForgotUsername(e.target.value)}
+                placeholder="Ví dụ: B2100001"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={forgotLoading}
+              className="w-full rounded-2xl bg-blue-600 px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {forgotLoading ? <Loader2 className="mx-auto animate-spin" size={18} /> : 'Gửi mã xác thực'}
+            </button>
+          </form>
+        ) : (
+          <form className="space-y-4" onSubmit={handleConfirmResetPassword}>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Mã xác thực</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={forgotCode}
+                onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Nhập 6 chữ số"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-lg font-black tracking-[0.35em] text-slate-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Mật khẩu mới</label>
+              <input
+                type="password"
+                value={forgotNewPassword}
+                onChange={(e) => setForgotNewPassword(e.target.value)}
+                placeholder="Ít nhất 8 ký tự"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Xác nhận mật khẩu mới</label>
+              <input
+                type="password"
+                value={forgotConfirmPassword}
+                onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                placeholder="Nhập lại mật khẩu mới"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotStep('request');
+                  setForgotCode('');
+                  setForgotNewPassword('');
+                  setForgotConfirmPassword('');
+                }}
+                className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50"
+              >
+                Gửi lại mã
+              </button>
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {forgotLoading ? <Loader2 className="mx-auto animate-spin" size={18} /> : 'Đổi mật khẩu'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  ) : null;
 
   // Dedicated Mobile / Portrait Viewport Layout (100% matched to your exact mobile template)
   if (isPhoneRatio) {
@@ -215,7 +410,11 @@ const Login = () => {
                 <a 
                   className="text-sm font-semibold text-blue-600 hover:text-blue-800" 
                   href="#"
-                  onClick={(e) => { e.preventDefault(); toast.success('Vui lòng liên hệ Văn phòng Khoa để đặt lại mật khẩu.'); }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setForgotUsername(username);
+                    setForgotOpen(true);
+                  }}
                 >
                   Quên mật khẩu?
                 </a>
@@ -256,6 +455,7 @@ const Login = () => {
           {/* END: Login Form Card */}
         </main>
         {/* END: Main Container */}
+        {forgotPasswordModal}
       </div>
     );
   }
@@ -428,7 +628,7 @@ const Login = () => {
                 <div className="flex items-center gap-3">
                   <div className="h-14 w-14 shrink-0 rounded-2xl bg-white/95 p-1.5 shadow-xl shadow-blue-950/30">
                     <img
-                      src="/logo-qlsv.png"
+                      src={LOGIN_LOGO_URL}
                       alt="Logo Khoa Kỹ Thuật Cơ Khí"
                       className="h-full w-full object-contain"
                     />
@@ -490,7 +690,7 @@ const Login = () => {
                   <img 
                     alt="CTUT Mechanical Engineering Logo" 
                     className="w-24 h-24 object-contain mb-6 drop-shadow-lg" 
-                    src="/logo-qlsv.png" 
+                    src={LOGIN_LOGO_URL} 
                   />
                   <h3 className="font-headline-md text-headline-md text-primary text-center mb-2 font-bold tracking-tight whitespace-nowrap">
                     ĐĂNG NHẬP HỆ THỐNG
@@ -572,7 +772,11 @@ const Login = () => {
                     <a 
                       className="text-secondary hover:text-primary-container font-bold transition-colors" 
                       href="#"
-                      onClick={(e) => { e.preventDefault(); toast.success('Vui lòng liên hệ Văn phòng Khoa để đặt lại mật khẩu.'); }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setForgotUsername(username);
+                        setForgotOpen(true);
+                      }}
                     >
                       Quên mật khẩu?
                     </a>
@@ -622,6 +826,7 @@ const Login = () => {
         </footer>
       </div>
 
+      {forgotPasswordModal}
     </div>
   );
 };

@@ -14,7 +14,7 @@ const Classes = () => {
     setLoading(true);
     try {
       const [classesRes, semestersRes] = await Promise.all([
-        api.get('/classes'),
+        api.get('/classes', { params: { include_counts: true } }),
         api.get('/semesters')
       ]);
       setClasses(classesRes.data);

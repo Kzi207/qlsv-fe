@@ -8,7 +8,7 @@ import { downloadXlsxFile } from '../utils/download';
 
 const Students = () => {
   const navigate = useNavigate();
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
@@ -21,6 +21,33 @@ const Students = () => {
     class_id: '',
   });
   const [classOptions, setClassOptions] = useState<any[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+
+  const sortStudents = (items: any[]) =>
+    [...items].sort((a: any, b: any) => {
+      const classCompare = String(a.class_id || '').localeCompare(String(b.class_id || ''));
+      if (classCompare !== 0) return classCompare;
+
+      const orderA = Number(a.order_number || 0);
+      const orderB = Number(b.order_number || 0);
+      if (orderA && orderB && orderA !== orderB) return orderA - orderB;
+      if (orderA && !orderB) return -1;
+      if (!orderA && orderB) return 1;
+
+      return String(a.student_code || '').localeCompare(String(b.student_code || ''));
+    });
+
+  const upsertStudent = (student: any) => {
+    setStudents((prev: any[]) => {
+      const index = prev.findIndex((item: any) => item.id === student.id);
+      if (index === -1) return sortStudents([...prev, student]);
+
+      const next = [...prev];
+      next[index] = { ...next[index], ...student };
+      return sortStudents(next);
+    });
+  };
 
   const fetchClasses = async () => {
     try {
@@ -58,15 +85,57 @@ const Students = () => {
     formData.append('file', file);
 
     const loadingToast = toast.loading('Đang xử lý file...');
+    setImporting(true);
+    setImportProgress({ current: 0, total: 0 });
+    toast.dismiss(loadingToast);
+    const progressToast = toast.loading('Dang doc file Excel...');
     try {
-      const res = await api.post('/students/import', formData, {
+      const previewRes = await api.post('/students/import/preview', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      toast.success(res.data.message, { id: loadingToast });
-      fetchStudents();
+      const items = Array.isArray(previewRes.data?.students) ? previewRes.data.students : [];
+      setImportProgress({ current: 0, total: items.length });
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        const payload = {
+          name: item.name,
+          student_code: item.student_code,
+          email: item.email,
+          class_id: item.class_id,
+          order_number: item.order_number,
+        };
+
+        try {
+          const res = item.action === 'update' && item.id
+            ? await api.put(`/students/${item.id}`, payload)
+            : await api.post('/students', payload);
+          upsertStudent(res.data);
+          successCount += 1;
+        } catch (_error) {
+          errorCount += 1;
+        } finally {
+          setImportProgress({ current: index + 1, total: items.length });
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(
+          errorCount > 0
+            ? `Da xu ly ${successCount} sinh vien, loi ${errorCount} sinh vien.`
+            : `Da xu ly thanh cong ${successCount} sinh vien.`,
+          { id: progressToast },
+        );
+      } else {
+        toast.error('Khong the nhap sinh vien tu file Excel.', { id: progressToast });
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Không thể nhập file', { id: loadingToast });
     } finally {
+      setImporting(false);
       e.target.value = '';
     }
   };
@@ -364,6 +433,30 @@ const Students = () => {
           </select>
         </div>
       </div>
+
+      {importing && (
+        <div className="rounded-3xl border border-emerald-100 bg-emerald-50/70 px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-black text-emerald-700">Dang nhap tung sinh vien tu file Excel</p>
+              <p className="text-xs font-medium text-emerald-600">
+                {importProgress.current}/{importProgress.total || 0} sinh vien da duoc xu ly
+              </p>
+            </div>
+            <Loader2 className="animate-spin text-emerald-600" size={20} />
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+              style={{
+                width: importProgress.total > 0
+                  ? `${Math.min(100, (importProgress.current / importProgress.total) * 100)}%`
+                  : '0%',
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         {/* Desktop View */}

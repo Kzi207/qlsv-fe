@@ -27,6 +27,10 @@ const STATUS_MAP: Record<string, { label: string; className: string }> = {
     label: 'Khong duyet',
     className: 'border-rose-200 bg-rose-50 text-rose-700',
   },
+  NOT_SUBMITTED: {
+    label: 'Chua nop',
+    className: 'border-slate-200 bg-slate-100 text-slate-600',
+  },
 };
 
 const AdminDRLManagement = () => {
@@ -41,6 +45,9 @@ const AdminDRLManagement = () => {
   const [filter, setFilter] = useState(() => {
     const saved = localStorage.getItem('drl_filters');
     const base = saved ? JSON.parse(saved) : { status: '', class_id: '', semester: '', keyword: '', assigned_only: false };
+    if (!['', 'SUBMITTED', 'NOT_SUBMITTED', 'APPROVED'].includes(String(base.status || ''))) {
+      base.status = '';
+    }
     // If user is BCH, force class_id to their class if not set
     if (isBch && !base.class_id) base.class_id = user?.class_id || '';
     return base;
@@ -96,6 +103,7 @@ const AdminDRLManagement = () => {
     try {
       const res = await api.get('/training/export', {
         params: {
+          status: filter.status || undefined,
           class_id: filter.class_id || undefined,
           semester: filter.semester || undefined,
           assigned_only: filter.assigned_only || undefined,
@@ -179,9 +187,9 @@ const AdminDRLManagement = () => {
             className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none"
           >
             <option value="">Tất cả trạng thái</option>
-            <option value="PENDING">Chờ duyệt</option>
+            <option value="SUBMITTED">Đã nộp</option>
+            <option value="NOT_SUBMITTED">Chưa nộp</option>
             <option value="APPROVED">Đã duyệt</option>
-            <option value="REJECTED">Không duyệt</option>
           </select>
         </label>
 
@@ -237,6 +245,7 @@ const AdminDRLManagement = () => {
             <div className="divide-y divide-slate-100">
               {filteredScores.map((score) => {
                 const status = STATUS_MAP[score.status] || STATUS_MAP.PENDING;
+                const canViewDetails = typeof score.id === 'number';
 
                 return (
                   <div
@@ -278,13 +287,20 @@ const AdminDRLManagement = () => {
                     </div>
 
                     <div className="flex items-center justify-end">
-                      <Link
-                        to={`/training/approval/${score.id}`}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-bold text-sky-700 transition hover:bg-sky-100"
-                      >
-                        <Eye size={16} />
-                        Chi tiết
-                      </Link>
+                      {canViewDetails ? (
+                        <Link
+                          to={`/training/approval/${score.id}`}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-bold text-sky-700 transition hover:bg-sky-100"
+                        >
+                          <Eye size={16} />
+                          Chi tiết
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-400">
+                          <Eye size={16} />
+                          Chưa nộp
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

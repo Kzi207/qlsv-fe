@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { User, Lock, Mail, Shield, Save, Loader2, Sparkles } from 'lucide-react';
+import { User, Lock, Mail, Shield, Save, Loader2, Sparkles, Phone, AtSign } from 'lucide-react';
 
 const Profile = () => {
   const { user, setUser } = useAuthStore();
@@ -10,8 +10,10 @@ const Profile = () => {
   const [passLoading, setPassLoading] = useState(false);
   
   const [formData, setFormData] = useState({
+    username: user?.username || '',
     name: user?.name || '',
     email: user?.email || '',
+    phone: user?.phone || '',
   });
 
   const [passData, setPassData] = useState({
@@ -22,8 +24,10 @@ const Profile = () => {
 
   useEffect(() => {
     setFormData({
+      username: user?.username || '',
       name: user?.name || '',
       email: user?.email || '',
+      phone: user?.phone || '',
     });
   }, [user]);
 
@@ -81,7 +85,24 @@ const Profile = () => {
             </h3>
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Họ và tên</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tên đăng nhập</label>
+                <div className="relative group">
+                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                      <AtSign size={16} />
+                   </div>
+                   <input
+                     type="text"
+                     value={formData.username}
+                     onChange={e => setFormData({ ...formData, username: e.target.value })}
+                     className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm transition-all bg-slate-50/50 focus:bg-white"
+                     placeholder="Tên đăng nhập"
+                     required
+                   />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tên hiển thị</label>
                 <div className="relative group">
                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">
                       <User size={16} />
@@ -91,7 +112,7 @@ const Profile = () => {
                      value={formData.name}
                      onChange={e => setFormData({ ...formData, name: e.target.value })}
                      className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm transition-all bg-slate-50/50 focus:bg-white"
-                     placeholder="Họ và tên của bạn"
+                     placeholder="Tên hiển thị của bạn"
                      required
                    />
                 </div>
@@ -109,6 +130,22 @@ const Profile = () => {
                      onChange={e => setFormData({ ...formData, email: e.target.value })}
                      className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm transition-all bg-slate-50/50 focus:bg-white"
                      placeholder="Email liên hệ"
+                   />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Số điện thoại</label>
+                <div className="relative group">
+                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                      <Phone size={16} />
+                   </div>
+                   <input
+                     type="text"
+                     value={formData.phone}
+                     onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                     className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm transition-all bg-slate-50/50 focus:bg-white"
+                     placeholder="Số điện thoại liên hệ"
                    />
                 </div>
               </div>

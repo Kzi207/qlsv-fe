@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { LifeBuoy, Loader2, Mail, Phone, RefreshCcw, User } from 'lucide-react';
+import { LifeBuoy, Loader2, Mail, Phone, RefreshCcw, Trash2, User } from 'lucide-react';
 import api from '../api/axios';
 
 type SupportStatus = 'NEW' | 'IN_PROGRESS' | 'RESOLVED';
@@ -35,14 +35,20 @@ const SupportManagement = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<SupportFilter>('ALL');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchSupportRequests = async () => {
     setLoading(true);
     try {
       const params = statusFilter === 'ALL' ? undefined : { status: statusFilter };
-      const res = await api.get<SupportRequestItem[]>('/support', { params });
+      const res = await api.get<SupportRequestItem[]>('/support', {
+        params: {
+          ...params,
+          limit: 100,
+        },
+      });
       setItems(res.data || []);
-    } catch (error) {
+    } catch {
       toast.error('Không thể tải danh sách hỗ trợ');
     } finally {
       setLoading(false);
@@ -63,6 +69,22 @@ const SupportManagement = () => {
       toast.error(error?.response?.data?.message || 'Không thể cập nhật trạng thái');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const deleteItem = async (id: number) => {
+    const confirmed = window.confirm('Xóa yêu cầu hỗ trợ này sau khi đã hoàn tất?');
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    try {
+      await api.delete(`/support/${id}`);
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      toast.success('Đã xóa yêu cầu hỗ trợ');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Không thể xóa yêu cầu hỗ trợ');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -210,6 +232,16 @@ const SupportManagement = () => {
                     >
                       Trả về mới
                     </button>
+                    {item.status === 'RESOLVED' && (
+                      <button
+                        onClick={() => deleteItem(item.id)}
+                        disabled={deletingId === item.id}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black uppercase tracking-wider text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deletingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        Xóa
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -222,4 +254,3 @@ const SupportManagement = () => {
 };
 
 export default SupportManagement;
-

@@ -14,7 +14,7 @@ import {
   ChevronRight,
   User,
   LifeBuoy,
-  History,
+  BarChart3,
   X
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
@@ -34,7 +34,6 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
       items: [
         { name: 'Trang chủ', path: '/', icon: LayoutDashboard, roles: ['STUDENT', 'ADMIN', 'BCH'] },
         { name: 'Cá nhân', path: '/profile', icon: User, roles: ['STUDENT', 'ADMIN', 'BCH'] },
-        { name: 'Lịch sử hoạt động', path: '/activity-history', icon: History, roles: ['STUDENT', 'ADMIN', 'BCH'] },
       ]
     },
     {
@@ -46,6 +45,7 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
         { name: 'Nộp phiếu DRL', path: '/training/evaluation/self', icon: ClipboardCheck, roles: ['STUDENT'] },
         { name: 'Nộp minh chứng', path: '/evidence/submit', icon: Award, roles: ['STUDENT'] },
         { name: 'Quản lý DRL', path: '/drl', icon: ClipboardCheck, roles: ['ADMIN', 'BCH'] },
+        { name: 'Thống kê ĐRL', path: '/training/statistics', icon: BarChart3, roles: ['ADMIN', 'BCH'] },
         { name: 'Duyệt minh chứng', path: '/evidence/review', icon: Award, roles: ['ADMIN', 'BCH'] },
       ]
     },
