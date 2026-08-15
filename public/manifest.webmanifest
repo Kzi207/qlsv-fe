@@ -1,5 +1,5 @@
 {
-  "name": "CTUT",
+  "name": "CTUT - Khoa Kỹ Thuật Cơ Khí",
   "short_name": "CTUT",
   "description": "QLSV CTUT - Hệ thống quản lý sinh viên và tra cứu điểm rèn luyện CTUT",
   "start_url": "/",
@@ -7,6 +7,16 @@
   "background_color": "#ffffff",
   "theme_color": "#1d4ed8",
   "icons": [
+    {
+      "src": "/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
@@ -16,6 +26,12 @@
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

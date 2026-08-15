@@ -15,6 +15,8 @@ import {
   User,
   LifeBuoy,
   BarChart3,
+  Sparkles,
+  ShieldCheck,
   X
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
@@ -34,6 +36,7 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
       items: [
         { name: 'Trang chủ', path: '/', icon: LayoutDashboard, roles: ['STUDENT', 'ADMIN', 'BCH'] },
         { name: 'Cá nhân', path: '/profile', icon: User, roles: ['STUDENT', 'ADMIN', 'BCH'] },
+        { name: 'Khảo sát ý kiến', path: (isAdmin || isBch) ? '/khaosat/admin' : '/khaosat', icon: Sparkles, roles: ['STUDENT', 'ADMIN', 'BCH'] },
       ]
     },
     {
@@ -47,6 +50,7 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
         { name: 'Quản lý DRL', path: '/drl', icon: ClipboardCheck, roles: ['ADMIN', 'BCH'] },
         { name: 'Thống kê ĐRL', path: '/training/statistics', icon: BarChart3, roles: ['ADMIN', 'BCH'] },
         { name: 'Duyệt minh chứng', path: '/evidence/review', icon: Award, roles: ['ADMIN', 'BCH'] },
+        { name: 'Nhập minh chứng Excel', path: '/evidence/import-excel', icon: Award, roles: ['ADMIN', 'BCH'] },
       ]
     },
     {
@@ -66,6 +70,7 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
         { name: 'Tài khoản', path: '/accounts', icon: UserPlus, roles: ['ADMIN'] },
         { name: 'Hỗ trợ', path: '/support', icon: LifeBuoy, roles: ['ADMIN'] },
         { name: 'Ban Cán Sự', path: '/bch', icon: UserCheck, roles: ['ADMIN'] },
+        { name: 'Quản lý Khảo sát', path: '/khaosat/admin', icon: ShieldCheck, roles: ['ADMIN'] },
       ]
     }
   ];

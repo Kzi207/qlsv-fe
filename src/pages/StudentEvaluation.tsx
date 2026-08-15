@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle2, ChevronDown, Award } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Award, Sparkles, MessageSquare, X } from 'lucide-react';
 import api from '../api/axios';
 import DetailedEvaluationForm from '../components/DetailedEvaluationForm';
 import { useAuthStore } from '../store/useAuthStore';
@@ -20,11 +21,13 @@ const parseDetails = (raw: any): Record<string, { score: number; files: any[]; a
 };
 
 export default function StudentEvaluation() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [semester, setSemester] = useState('');
   const [semesterOptions, setSemesterOptions] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<any>(null);
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [savedDetails, setSavedDetails] = useState<Record<string, { score: number; files: any[]; activities?: any[] }> | null>(null);
   const [savedAdminDetails, setSavedAdminDetails] = useState<Record<string, number> | null>(null);
   const [submissionWindow, setSubmissionWindow] = useState<{ isOpen: boolean; deadline: string | null } | null>(null);
@@ -107,6 +110,7 @@ export default function StudentEvaluation() {
       });
       setSavedDetails(parseDetails(res.data?.details || payload.details));
       setSubmitted(res.data);
+      setShowSurveyModal(true);
       toast.success('Đã nộp phiếu rèn luyện thành công');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Có lỗi xảy ra');
@@ -122,9 +126,59 @@ export default function StudentEvaluation() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const surveyModalElement = showSurveyModal ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-5 animate-scale-up relative overflow-hidden">
+        <button
+          onClick={() => setShowSurveyModal(false)}
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-sky-500/30">
+          <Sparkles size={32} />
+        </div>
+
+        <div className="space-y-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-sky-600 bg-sky-50 px-2.5 py-1 rounded-full border border-sky-100">
+            Khảo sát cảm nhận người dùng
+          </span>
+          <h3 className="text-xl font-black text-slate-900 leading-tight">
+            Bạn có muốn đánh giá & góp ý về ứng dụng không?
+          </h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Ý kiến của bạn rất quan trọng để Ban Quản Trị nâng cấp và tối ưu hóa hệ thống ngày càng tốt hơn!
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2.5 pt-2">
+          <button
+            onClick={() => {
+              setShowSurveyModal(false);
+              navigate('/khaosat');
+            }}
+            className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-sky-500/25 transition active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <MessageSquare size={16} />
+            Đánh giá & Góp ý ngay
+          </button>
+
+          <button
+            onClick={() => setShowSurveyModal(false)}
+            className="w-full py-3 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition"
+          >
+            Để sau
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] p-4 text-center animate-fade-up">
+        {surveyModalElement}
         <div className="h-20 w-20 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-6 shadow-inner">
            <CheckCircle2 size={40} />
         </div>
@@ -150,6 +204,7 @@ export default function StudentEvaluation() {
 
   return (
     <div className="max-w-5xl space-y-6 md:space-y-8 pb-20 animate-fade-up">
+      {surveyModalElement}
       {/* Compact Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-2">
         <div className="space-y-1">
@@ -157,7 +212,7 @@ export default function StudentEvaluation() {
             <Award size={10} />
             Hệ thống nộp phiếu ĐRL
           </div>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Kê khai điểm rèn luyện</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Phiếu điểm rèn luyện</h1>
           <p className="text-slate-400 font-bold text-xs">Điền đầy đủ thông tin và minh chứng để được xét duyệt</p>
         </div>
 

@@ -35,10 +35,20 @@ export const useAuthStore = create<AuthState>((set) => ({
   initializeAuth: async () => {
     // Alternative strategy: if we just logged out, don't even try to re-fetch auth
     const justLoggedOut = localStorage.getItem('qlsv_just_logged_out');
-    if (justLoggedOut === 'true') {
-      localStorage.removeItem('qlsv_just_logged_out');
-      set({ user: null, isAuthenticated: false, authInitialized: true });
-      return;
+    if (justLoggedOut) {
+      const loggedOutTime = parseInt(justLoggedOut, 10);
+      const isRecentLogout = !isNaN(loggedOutTime) && (Date.now() - loggedOutTime < 8000);
+      
+      if (justLoggedOut === 'true' || isRecentLogout) {
+        // Clear after a small timeout to allow React Strict Mode remounts to see the flag
+        setTimeout(() => {
+          localStorage.removeItem('qlsv_just_logged_out');
+        }, 1000);
+        set({ user: null, isAuthenticated: false, authInitialized: true });
+        return;
+      } else {
+        localStorage.removeItem('qlsv_just_logged_out');
+      }
     }
 
     try {
@@ -64,8 +74,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: normalizeUser(user), isAuthenticated: true, authInitialized: true });
   },
   logout: async () => {
-    // 1. Mark as logged out locally immediately
-    localStorage.setItem('qlsv_just_logged_out', 'true');
+    // 1. Mark as logged out locally immediately with a timestamp
+    localStorage.setItem('qlsv_just_logged_out', Date.now().toString());
     clearFallbackAuthToken();
     
     // 2. Clear all potentially sensitive local data

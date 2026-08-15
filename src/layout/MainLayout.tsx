@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import { Menu, Home, CalendarCheck, Award, User, LogOut, MessageCircle, Sparkles } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { normalizeUserRole } from '../utils/auth';
+import ScrollToTop from '../components/ScrollToTop';
 const StudentChatbot = lazy(() => import('../components/StudentChatbot'));
 
 const ChatbotEntry = () => {
@@ -137,6 +138,7 @@ const MainLayout = () => {
       {/* Global Bottom Nav for Students */}
       {isStudent && !isSidebarOpen && <BottomNav />}
       {isStudent && <ChatbotEntry />}
+      <ScrollToTop className={isStudent ? 'bottom-44 right-4 lg:bottom-24 lg:right-6' : 'bottom-6 right-6'} />
     </div>
   );
 };

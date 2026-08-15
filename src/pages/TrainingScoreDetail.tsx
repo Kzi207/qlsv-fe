@@ -29,15 +29,15 @@ type PopupState = {
 
 const STATUS_META: Record<string, { label: string; className: string }> = {
   PENDING: {
-    label: 'Cho duyet',
+    label: 'Chờ duyệt',
     className: 'border-amber-200 bg-amber-50 text-amber-700',
   },
   APPROVED: {
-    label: 'Da duyet',
+    label: 'Đã duyệt',
     className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   },
   REJECTED: {
-    label: 'Khong duyet',
+    label: 'Không duyệt',
     className: 'border-rose-200 bg-rose-50 text-rose-700',
   },
 };
@@ -73,7 +73,7 @@ const TrainingScoreDetail = () => {
         });
         setAdminScores(nextAdminScores);
       } catch (error) {
-        toast.error('Khong the tai thong tin phieu diem');
+        toast.error('Không thể tải thông tin phiếu điểm');
         navigate('/drl');
       } finally {
         setLoading(false);
@@ -129,10 +129,10 @@ const TrainingScoreDetail = () => {
         admin_details: adminScores,
         admin_total: adminTotal,
       }));
-      toast.success(status === 'APPROVED' ? 'Da duyet phieu thanh cong' : 'Da cap nhat ket qua cham');
+      toast.success(status === 'APPROVED' ? 'Đã duyệt phiếu thành công' : 'Đã cập nhật kết quả chấm');
       navigate('/drl');
     } catch (error: any) {
-      const errMsg = error?.response?.data?.message || 'Khong the luu ket qua duyet';
+      const errMsg = error?.response?.data?.message || 'Không thể lưu kết quả duyệt';
       const detail = error?.response?.data?.error;
       toast.error(detail ? `${errMsg}: ${detail}` : errMsg);
     } finally {
@@ -212,7 +212,7 @@ const TrainingScoreDetail = () => {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-slate-400">
           <Loader2 className="h-10 w-10 animate-spin text-sky-500" />
-          <p>Dang tai phieu diem...</p>
+          <p>Đang tải phiếu điểm...</p>
         </div>
       </div>
     );
@@ -231,14 +231,14 @@ const TrainingScoreDetail = () => {
             className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-slate-800"
           >
             <ArrowLeft size={16} />
-            Quay lai danh sach
+            Quay lại danh sách
           </button>
 
           <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-sky-600">Chi tiet phieu DRL</p>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900">Phieu diem ren luyen dang bang</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-sky-600">Chi tiết phiếu DRL</p>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900">Phiếu điểm rèn luyện dạng bảng</h1>
             <p className="max-w-3xl text-sm leading-6 text-slate-500">
-              So sanh diem sinh vien da nop va diem lop cham tren tung muc, xem minh chung trong popup va duyet tung dong ngay tren bang.
+              So sánh điểm sinh viên đã nộp và điểm lớp chấm trên từng mục, xem minh chứng trong popup và duyệt từng dòng ngay trên bảng.
             </p>
           </div>
         </div>
@@ -248,8 +248,8 @@ const TrainingScoreDetail = () => {
           <div className="text-sm text-slate-600">
             <p className="font-semibold text-slate-900">{data.student?.name}</p>
             <p>MSSV: {data.student?.student_code}</p>
-            <p>Lop: {data.student?.class_id}</p>
-            <p>Hoc ky: {typeof data.semester === 'object' ? data.semester?.name : data.semester}</p>
+            <p>Lớp: {data.student?.class_id}</p>
+            <p>Học kỳ: {typeof data.semester === 'object' ? data.semester?.name : data.semester}</p>
           </div>
         </div>
       </div>
@@ -261,24 +261,24 @@ const TrainingScoreDetail = () => {
               <UserRound size={22} />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Sinh vien</p>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Sinh viên</p>
               <p className="text-lg font-black text-slate-900">{data.student?.name}</p>
             </div>
           </div>
         </div>
 
         <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Tong SV tu cham</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Tổng SV tự chấm</p>
           <p className="mt-2 text-4xl font-black text-slate-900">{studentTotal}</p>
         </div>
 
         <div className="rounded-[2rem] border border-slate-200 bg-sky-50 p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-500">Tong lop cham</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-500">Tổng lớp chấm</p>
           <p className="mt-2 text-4xl font-black text-sky-700">{adminTotal}</p>
         </div>
 
         <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Ngay nop</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Ngày nộp</p>
           <p className="mt-2 text-lg font-black text-slate-900">
             {data.createdAt ? new Date(data.createdAt).toLocaleDateString('vi-VN') : '--'}
           </p>
@@ -581,28 +581,28 @@ const TrainingScoreDetail = () => {
               <MessageSquareText size={20} />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Ghi chu admin</p>
-              <p className="text-sm text-slate-500">Nhap nhan xet chung hoac ly do khong duyet.</p>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Ghi chú admin</p>
+              <p className="text-sm text-slate-500">Nhập nhận xét chung hoặc lý do không duyệt.</p>
             </div>
           </div>
           <textarea
             value={adminNotes}
             onChange={(e) => setAdminNotes(e.target.value)}
             rows={5}
-            placeholder="Nhap ghi chu xu ly phieu..."
+            placeholder="Nhập ghi chú xử lý phiếu..."
             className="w-full rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-sky-300 focus:bg-white"
           />
         </div>
 
         <div className="rounded-[2rem] border border-slate-200 bg-slate-900 p-5 text-white shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-300">Tong hop ket qua</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-300">Tổng hợp kết quả</p>
           <div className="mt-5 space-y-4">
             <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
-              <span className="text-sm text-slate-300">Tong SV tu cham</span>
+              <span className="text-sm text-slate-300">Tổng SV tự chấm</span>
               <span className="text-2xl font-black">{studentTotal}</span>
             </div>
             <div className="flex items-center justify-between rounded-2xl bg-sky-500/15 px-4 py-3">
-              <span className="text-sm text-sky-100">Tong lop cham</span>
+              <span className="text-sm text-sky-100">Tổng lớp chấm</span>
               <span className="text-2xl font-black text-sky-300">{adminTotal}</span>
             </div>
           </div>
@@ -614,7 +614,7 @@ const TrainingScoreDetail = () => {
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-600 disabled:opacity-60"
             >
               {savingStatus === 'APPROVED' ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
-              Luu va duyet phieu
+              Lưu và duyệt phiếu
             </button>
             <button
               onClick={() => handleSave('REJECTED')}
@@ -622,7 +622,7 @@ const TrainingScoreDetail = () => {
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/30 bg-rose-500/15 px-4 py-3 text-sm font-bold text-rose-100 transition hover:bg-rose-500/25 disabled:opacity-60"
             >
               {savingStatus === 'REJECTED' ? <Loader2 size={18} className="animate-spin" /> : <X size={18} />}
-              Luu va khong duyet
+              Lưu và không duyệt
             </button>
           </div>
         </div>

@@ -18,6 +18,7 @@ const QRScannerCheckIn = lazy(() => import('./pages/QRScannerCheckIn'));
 const StudentEvaluation = lazy(() => import('./pages/StudentEvaluation'));
 const StudentEvidence = lazy(() => import('./pages/StudentEvidence'));
 const AdminEvidenceReview = lazy(() => import('./pages/AdminEvidenceReview'));
+const AdminEvidenceImport = lazy(() => import('./pages/AdminEvidenceImport'));
 const AccountManagement = lazy(() => import('./pages/AccountManagement'));
 const AdminDRLManagement = lazy(() => import('./pages/AdminDRLManagement'));
 const Classes = lazy(() => import('./pages/Classes'));
@@ -30,6 +31,9 @@ const Profile = lazy(() => import('./pages/Profile'));
 const PublicEventRegister = lazy(() => import('./pages/PublicEventRegister'));
 const EventManagement = lazy(() => import('./pages/EventManagement'));
 const SupportManagement = lazy(() => import('./pages/SupportManagement'));
+const PublicSurvey = lazy(() => import('./pages/PublicSurvey'));
+const SurveyAdmin = lazy(() => import('./pages/SurveyAdmin'));
+const AiPromptRulesAdmin = lazy(() => import('./pages/AiPromptRulesAdmin'));
 
 const PageFallback = () => (
   <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -52,6 +56,13 @@ function App() {
   const isStudent = normalizeUserRole(user?.role) === 'STUDENT';
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('google_auth')) {
+      // Bỏ qua initializeAuth nếu URL chứa google_auth vì trang Login.tsx sẽ tự xử lý việc
+      // lưu token và chuyển hướng. Nếu chạy lúc này sẽ gửi request /auth/me không kèm token,
+      // khi nhận phản hồi 401 sẽ vô tình xóa token vừa được Login.tsx lưu.
+      return;
+    }
     initializeAuth();
   }, [initializeAuth]);
 
@@ -67,8 +78,10 @@ function App() {
             }
           />
           
-          {/* STANDALONE PUBLIC EVENT REGISTRATION ROUTE */}
+          {/* STANDALONE PUBLIC ROUTE */}
           <Route path="/dangky" element={<PublicEventRegister />} />
+          <Route path="/khaosat" element={<PublicSurvey />} />
+          <Route path="/khaosat/admin" element={<SurveyAdmin />} />
 
           <Route
             path="/"
@@ -94,6 +107,8 @@ function App() {
             <Route path="training/approval" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><TrainingScoreApproval /></RoleRoute>} />
             <Route path="training/statistics" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><TrainingStatistics /></RoleRoute>} />
             <Route path="evidence/review" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><AdminEvidenceReview /></RoleRoute>} />
+            <Route path="evidence/import-excel" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><AdminEvidenceImport /></RoleRoute>} />
+            <Route path="ai/admin" element={<RoleRoute allowedRoles={['ADMIN', 'BCH']}><AiPromptRulesAdmin /></RoleRoute>} />
 
             {/* ADMIN ONLY ROUTES */}
             <Route path="bch" element={<RoleRoute allowedRoles={['ADMIN']}><BCHManagement /></RoleRoute>} />

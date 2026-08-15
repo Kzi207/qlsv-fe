@@ -9,6 +9,7 @@ import {
   Minimize2,
   Send,
   Sparkles,
+  Trash2,
   X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -45,6 +46,7 @@ type ChatMessage = {
   actions?: ChatAction[];
   suggestions?: string[];
   needsHumanSupport?: boolean;
+  timestamp: Date;
 };
 
 const quickPrompts = [
@@ -57,6 +59,9 @@ const quickPrompts = [
 const ONE_CENTIMETER_IN_CSS_PIXELS = 38;
 
 const createId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const formatTime = (date: Date) =>
+  date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
 const renderFormattedMessage = (content: string) => {
   return content.split(/\r?\n/).map((line, lineIndex, lines) => {
@@ -104,12 +109,19 @@ const StudentChatbot = ({ initiallyOpen = false }: { initiallyOpen?: boolean }) 
         content:
           'Xin chào! Mình có thể hỗ trợ bạn về điểm danh, điểm rèn luyện, minh chứng và thông tin cá nhân.',
         suggestions: quickPrompts,
+        timestamp: new Date(),
       },
     ],
     [],
   );
 
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll to bottom khi có tin mới
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -146,7 +158,7 @@ const StudentChatbot = ({ initiallyOpen = false }: { initiallyOpen?: boolean }) 
     setLoading(true);
     setMessages((prev) => [
       ...prev,
-      { id: createId(), role: 'user', content: question },
+      { id: createId(), role: 'user', content: question, timestamp: new Date() },
     ]);
 
     try {
@@ -164,6 +176,7 @@ const StudentChatbot = ({ initiallyOpen = false }: { initiallyOpen?: boolean }) 
           actions: data.actions,
           suggestions: data.suggestions,
           needsHumanSupport: data.needsHumanSupport,
+          timestamp: new Date(),
         },
       ]);
       setSupportSubject(data.topic ? `Hỏi về ${data.topic}` : 'Yêu cầu hỗ trợ từ chatbot');
@@ -178,6 +191,7 @@ const StudentChatbot = ({ initiallyOpen = false }: { initiallyOpen?: boolean }) 
           role: 'bot',
           content: 'Mình chưa thể phản hồi lúc này. Bạn có thể gửi yêu cầu hỗ trợ để được cán bộ phụ trách xử lý.',
           needsHumanSupport: true,
+          timestamp: new Date(),
         },
       ]);
     } finally {
@@ -242,14 +256,24 @@ const StudentChatbot = ({ initiallyOpen = false }: { initiallyOpen?: boolean }) 
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300">Hỏi đáp nhanh</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="rounded-lg p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
-                title="Thu nhỏ"
-              >
-                <Minimize2 size={16} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => { setMessages(initialMessages); setShowSupportForm(false); }}
+                  className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white"
+                  title="Xóa hội thoại"
+                >
+                  <Trash2 size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="rounded-lg p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
+                  title="Thu nhỏ"
+                >
+                  <Minimize2 size={16} />
+                </button>
+              </div>
             </div>
 
             <div className="max-h-[430px] space-y-3 overflow-y-auto bg-slate-50 p-4">
@@ -263,6 +287,11 @@ const StudentChatbot = ({ initiallyOpen = false }: { initiallyOpen?: boolean }) 
                     }`}
                   >
                     <div className="break-words">{renderFormattedMessage(message.content)}</div>
+                    <p className={`mt-1 text-[10px] ${
+                      message.role === 'user' ? 'text-blue-200 text-right' : 'text-slate-400'
+                    }`}>
+                      {formatTime(message.timestamp)}
+                    </p>
 
                     {message.actions && message.actions.length > 0 && (
                       <div className="mt-3 space-y-2">
@@ -311,12 +340,14 @@ const StudentChatbot = ({ initiallyOpen = false }: { initiallyOpen?: boolean }) 
 
               {loading && (
                 <div className="flex justify-start">
-                  <div className="flex items-center gap-2 rounded-2xl border border-slate-100 bg-white px-3 py-2 text-xs font-bold text-slate-500 shadow-sm">
-                    <Loader2 size={14} className="animate-spin" />
-                    Đang trả lời
+                  <div className="flex items-center gap-1.5 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+                    <span className="h-2 w-2 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.3s]" />
+                    <span className="h-2 w-2 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.15s]" />
+                    <span className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" />
                   </div>
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             {showSupportForm && (
@@ -368,7 +399,7 @@ const StudentChatbot = ({ initiallyOpen = false }: { initiallyOpen?: boolean }) 
                 onChange={(event) => setInput(event.target.value)}
                 className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
                 placeholder="Nhập câu hỏi..."
-                maxLength={1000}
+                maxLength={500}
               />
               <button
                 type="submit"

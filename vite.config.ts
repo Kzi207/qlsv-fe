@@ -29,6 +29,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiTarget = env.VITE_API_TARGET?.trim()
   const allowedHosts = Array.from(new Set([
+    'app.khanhduy.id.vn',
     'myctut.kzii.site',
     ...(env.VITE_DEV_ALLOWED_HOSTS
       ?.split(',')
@@ -39,6 +40,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), printNetworkUrls()],
     build: {
+      // Tắt source map — không lộ source code trong trình duyệt
+      sourcemap: false,
       chunkSizeWarningLimit: 900,
       rollupOptions: {
         output: {

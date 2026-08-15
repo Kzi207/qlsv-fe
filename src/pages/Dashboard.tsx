@@ -54,8 +54,9 @@ interface DashboardPayload {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getGreeting = () => {
   const h = new Date().getHours();
-  if (h < 12) return 'Chào buổi sáng';
-  if (h < 18) return 'Chào buổi chiều';
+  if (h >= 5 && h < 11) return 'Chào buổi sáng';
+  if (h >= 11 && h < 14) return 'Chào buổi trưa';
+  if (h >= 14 && h < 18) return 'Chào buổi chiều';
   return 'Chào buổi tối';
 };
 

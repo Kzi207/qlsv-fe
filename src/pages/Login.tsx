@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import api, { apiConfigError, setFallbackAuthToken } from '../api/axios';
+import api, { apiBaseUrl, apiConfigError, setFallbackAuthToken } from '../api/axios';
 import toast from 'react-hot-toast';
 import { Loader2, X } from 'lucide-react';
 
@@ -22,7 +22,10 @@ const Login = () => {
   const [forgotResetToken, setForgotResetToken] = useState('');
   const [forgotStep, setForgotStep] = useState<'request' | 'confirm'>('request');
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const login = useAuthStore((state) => state.login);
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const navigate = useNavigate();
   const mobileBackgroundStyle = LOGIN_BACKGROUND_IMAGE_URL
     ? {
@@ -62,6 +65,67 @@ const Login = () => {
     window.addEventListener('resize', checkRatio);
     return () => window.removeEventListener('resize', checkRatio);
   }, []);
+
+  // Check if Google login is enabled
+  useEffect(() => {
+    api.get('/auth/google/status')
+      .then((res) => setGoogleEnabled(Boolean(res.data?.enabled)))
+      .catch(() => setGoogleEnabled(false));
+  }, []);
+
+  // Handle Google OAuth callback from URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleAuth = params.get('google_auth');
+    const googleError = params.get('error');
+    const errorEmail = params.get('email');
+
+    if (googleAuth) {
+      try {
+        const authData = JSON.parse(googleAuth);
+        if (authData.accessToken && authData.user) {
+          setFallbackAuthToken(authData.accessToken, true);
+          login(authData.user);
+          toast.success('Đăng nhập bằng Google thành công!');
+          // Clean up URL params
+          window.history.replaceState({}, '', '/login');
+          const redirectPath = params.get('redirect') || '/';
+          navigate(redirectPath, { replace: true });
+        } else {
+          initializeAuth();
+        }
+      } catch {
+        toast.error('Không thể xử lý dữ liệu đăng nhập Google.');
+        window.history.replaceState({}, '', '/login');
+        initializeAuth();
+      }
+      return;
+    }
+
+    if (googleError) {
+      const errorMessages: Record<string, string> = {
+        google_no_code: 'Google không trả về mã xác thực.',
+        google_no_token: 'Không nhận được token từ Google.',
+        google_no_email: 'Không lấy được email từ tài khoản Google.',
+        google_email_not_found: errorEmail
+          ? `Email ${errorEmail} chưa được đăng ký trong hệ thống.`
+          : 'Email Google không tồn tại trong hệ thống.',
+        google_auth_failed: 'Đăng nhập Google thất bại. Vui lòng thử lại.',
+      };
+      toast.error(errorMessages[googleError] || 'Đăng nhập Google thất bại.');
+      window.history.replaceState({}, '', '/login');
+      initializeAuth();
+    }
+  }, [login, navigate, initializeAuth]);
+
+  const handleGoogleLogin = () => {
+    setGoogleLoading(true);
+    // Redirect to backend Google auth endpoint
+    const googleAuthUrl = apiBaseUrl.startsWith('/')
+      ? `${apiBaseUrl}/auth/google`
+      : `${apiBaseUrl}/auth/google`;
+    window.location.href = googleAuthUrl;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -438,6 +502,37 @@ const Login = () => {
                 )}
               </button>
 
+              {/* Google Login Button - Mobile */}
+              {googleEnabled && (
+                <>
+                  <div className="flex items-center gap-3 mt-2">
+                    <div className="flex-grow h-[1px] bg-gray-200"></div>
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">hoặc</span>
+                    <div className="flex-grow h-[1px] bg-gray-200"></div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={googleLoading}
+                    className="w-full py-3.5 bg-white border-2 border-gray-200 text-gray-700 rounded-2xl font-bold flex items-center justify-center space-x-3 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
+                  >
+                    {googleLoading ? (
+                      <Loader2 className="animate-spin" size={20} />
+                    ) : (
+                      <>
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                        </svg>
+                        <span>Đăng nhập bằng Google</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+
               {/* Security Notice Footer */}
               <div className="mt-8 p-4 bg-blue-50 rounded-2xl flex items-center space-x-4 border border-blue-100" data-purpose="security-notice">
                 <div className="bg-blue-600 p-2 rounded-xl text-white">
@@ -601,7 +696,7 @@ const Login = () => {
             <img 
               alt="CTUT Campus Building" 
               className="w-full h-full object-cover object-center" 
-              src="ChatGPT Image 17_42_48 20 thg 5, 2026.png" 
+              src="login.png" 
             />
             <div className="absolute inset-0 bg-overlay z-10"></div>
             
@@ -684,12 +779,12 @@ const Login = () => {
 
             {/* Right Side: Login Card */}
             <div className="login-card-wrapper w-[460px] ml-auto mr-0">
-              <div className="glass-card rounded-[2rem] p-12 transition-all duration-500">
+              <div className="glass-card rounded-[2rem] p-8 transition-all duration-500">
                 
-                <div className="flex flex-col items-center mb-8">
+                <div className="flex flex-col items-center mb-5">
                   <img 
                     alt="CTUT Mechanical Engineering Logo" 
-                    className="w-24 h-24 object-contain mb-6 drop-shadow-lg" 
+                    className="w-20 h-20 object-contain mb-4 drop-shadow-lg" 
                     src={LOGIN_LOGO_URL} 
                   />
                   <h3 className="font-headline-md text-headline-md text-primary text-center mb-2 font-bold tracking-tight whitespace-nowrap">
@@ -705,7 +800,7 @@ const Login = () => {
                 </div>
 
                 {/* Core Active Form */}
-                <form className="space-y-6" onSubmit={handleSubmit}>
+                <form className="space-y-4" onSubmit={handleSubmit}>
                   
                   {/* Username */}
                   <div className="space-y-2 group">
@@ -717,7 +812,7 @@ const Login = () => {
                         person
                       </span>
                       <input 
-                        className="w-full bg-transparent border-none py-4 pl-12 pr-4 focus:ring-0 text-on-surface placeholder:text-outline-variant outline-none" 
+                        className="w-full bg-transparent border-none py-3.5 pl-12 pr-4 focus:ring-0 text-on-surface placeholder:text-outline-variant outline-none" 
                         placeholder="Nhập tên đăng nhập" 
                         type="text"
                         value={username}
@@ -737,7 +832,7 @@ const Login = () => {
                         lock
                       </span>
                       <input 
-                        className="w-full bg-transparent border-none py-4 pl-12 pr-12 focus:ring-0 text-on-surface placeholder:text-outline-variant outline-none" 
+                        className="w-full bg-transparent border-none py-3.5 pl-12 pr-12 focus:ring-0 text-on-surface placeholder:text-outline-variant outline-none" 
                         placeholder="Nhập mật khẩu" 
                         type={showPassword ? 'text' : 'password'}
                         value={password}
@@ -784,7 +879,7 @@ const Login = () => {
 
                   {/* Submit Action */}
                   <button 
-                    className="w-full vibrant-btn text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed"
+                    className="w-full vibrant-btn text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed"
                     type="submit"
                     disabled={loading}
                   >
@@ -797,10 +892,41 @@ const Login = () => {
                       </>
                     )}
                   </button>
+
+                  {/* Google Login Button - Desktop */}
+                  {googleEnabled && (
+                    <>
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="h-[1px] flex-grow bg-[#c3c6d6]/40"></div>
+                        <span className="text-label-md text-outline font-semibold uppercase tracking-widest">hoặc</span>
+                        <div className="h-[1px] flex-grow bg-[#c3c6d6]/40"></div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleGoogleLogin}
+                        disabled={googleLoading}
+                        className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border-2 border-[#c3c6d6]/50 bg-white text-on-surface font-bold transition-all hover:bg-slate-50 hover:border-[#c3c6d6] hover:shadow-md active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed"
+                      >
+                        {googleLoading ? (
+                          <Loader2 className="animate-spin" size={18} />
+                        ) : (
+                          <>
+                            <svg className="h-5 w-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                            </svg>
+                            <span>Đăng nhập bằng Google</span>
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
                 </form>
 
                 {/* Trust Footer */}
-                <div className="mt-10 flex flex-col items-center gap-3">
+                <div className="mt-6 flex flex-col items-center gap-3">
                   <div className="flex items-center gap-2 text-label-md text-on-surface-variant font-medium">
                     <span className="material-symbols-outlined text-secondary text-lg">security</span>
                     <span className="text-center text-xs">Bảo mật thông tin của bạn là ưu tiên hàng đầu.</span>
@@ -814,14 +940,14 @@ const Login = () => {
         </main>
 
         {/* Footer Area */}
-        <footer className="absolute bottom-4 w-full flex justify-between items-center px-8 z-30">
-          <div className="text-label-md font-bold text-white/90">
+        <footer className="fixed bottom-0 left-0 w-full flex flex-col md:flex-row justify-between items-center gap-4 px-8 py-6 bg-transparent z-30">
+          <div className="text-label-md font-bold text-white/90 text-center md:text-left" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)' }}>
             © 2026 Khoa Kỹ thuật Cơ khí - Trường Đại học Kỹ thuật - Công nghệ Cần Thơ
           </div>
           <div className="flex items-center gap-6">
-            <a className="text-label-md font-bold text-white/70 hover:text-white transition-colors underline-offset-4 hover:underline" href="/chinhsachbaomat.html">Chính sách bảo mật</a>
-            <a className="text-label-md font-bold text-white/70 hover:text-white transition-colors underline-offset-4 hover:underline" href="/dieukhoansudung.html">Điều khoản sử dụng</a>
-            <a className="text-label-md font-bold text-white/70 hover:text-white transition-colors underline-offset-4 hover:underline" href="/thongtinlienhe.html">Thông tin liên hệ</a>
+            <a className="text-label-md font-bold text-white/70 hover:text-white transition-colors underline-offset-4 hover:underline" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)' }} href="/chinhsachbaomat.html">Chính sách bảo mật</a>
+            <a className="text-label-md font-bold text-white/70 hover:text-white transition-colors underline-offset-4 hover:underline" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)' }} href="/dieukhoansudung.html">Điều khoản sử dụng</a>
+            <a className="text-label-md font-bold text-white/70 hover:text-white transition-colors underline-offset-4 hover:underline" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)' }} href="/thongtinlienhe.html">Thông tin liên hệ</a>
           </div>
         </footer>
       </div>

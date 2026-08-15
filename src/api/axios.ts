@@ -367,11 +367,30 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401) {
       invalidateApiCache();
-      writeStoredCsrfToken('');
-      clearFallbackAuthToken();
       const isPublicPath = window.location.pathname === '/login' || window.location.pathname.startsWith('/dangky');
-      if (!isPublicPath && !isAuthProbeRequest(originalRequest.url)) {
-        window.location.href = '/login';
+      if (!isPublicPath) {
+        // Chỉ xóa token nếu request bị từ chối thực sự đã gửi token đó đi.
+        // Tránh trường hợp request /auth/me gửi trước khi token được lưu (race condition lúc login Google)
+        // khi phản hồi 401 về sẽ xóa nhầm token mới lưu.
+        const reqAuthHeader = originalRequest.headers instanceof AxiosHeaders
+          ? originalRequest.headers.get('Authorization')
+          : originalRequest.headers?.['Authorization'] || originalRequest.headers?.['authorization'];
+        
+        const currentToken = readStoredAuthToken();
+        
+        // Nếu request có gửi token và trùng với token hiện tại, hoặc request không gửi token và hiện tại cũng không có token nào mới được set
+        const shouldClear = reqAuthHeader
+          ? (String(reqAuthHeader) === `Bearer ${currentToken}`)
+          : !currentToken;
+
+        if (shouldClear) {
+          writeStoredCsrfToken('');
+          clearFallbackAuthToken();
+        }
+
+        if (!isAuthProbeRequest(originalRequest.url)) {
+          window.location.href = '/login';
+        }
       }
     }
 

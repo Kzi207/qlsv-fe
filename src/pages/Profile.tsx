@@ -84,19 +84,22 @@ const Profile = () => {
               <Shield size={16} className="text-blue-600" /> Thông tin cơ bản
             </h3>
             <form onSubmit={handleUpdateProfile} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tên đăng nhập</label>
+               <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tên đăng nhập</label>
+                  <span className="text-[10px] font-bold text-slate-400 font-mono">(Cố định - Không thể thay đổi)</span>
+                </div>
                 <div className="relative group">
-                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors">
                       <AtSign size={16} />
                    </div>
                    <input
                      type="text"
                      value={formData.username}
-                     onChange={e => setFormData({ ...formData, username: e.target.value })}
-                     className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm transition-all bg-slate-50/50 focus:bg-white"
+                     readOnly
+                     disabled
+                     className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 outline-none font-bold text-sm transition-all bg-slate-100 text-slate-500 cursor-not-allowed select-none"
                      placeholder="Tên đăng nhập"
-                     required
                    />
                 </div>
               </div>
